@@ -35,10 +35,17 @@ class ProductsCollection extends ResourceCollection
         $columns = new Columns([
             Column::make('name')->label(__('statamic-products::messages.column_name'))->sortable(true)->defaultOrder(1),
             Column::make('handle')->label(__('statamic-products::messages.column_handle'))->sortable(true)->defaultOrder(2),
-            Column::make('amount')->label(__('statamic-products::messages.column_amount'))->sortable(true)->numeric(true)->defaultOrder(3),
-            Column::make('digital')->label(__('statamic-products::messages.column_digital'))->sortable(true)->defaultOrder(4),
-            Column::make('grants')->label(__('statamic-products::messages.column_grants'))->sortable(false)->numeric(true)->defaultOrder(5),
-            Column::make('active')->label(__('statamic-products::messages.column_active'))->sortable(true)->defaultOrder(6),
+            Column::make('type')->label(__('statamic-products::messages.column_type'))->sortable(true)->defaultOrder(3),
+            Column::make('amount')->label(__('statamic-products::messages.column_amount'))->sortable(true)->numeric(true)->defaultOrder(4),
+            Column::make('digital')->label(__('statamic-products::messages.column_digital'))->sortable(true)->defaultOrder(5),
+            Column::make('grants')->label(__('statamic-products::messages.column_grants'))->sortable(false)->numeric(true)->defaultOrder(6),
+            Column::make('active')->label(__('statamic-products::messages.column_active'))->sortable(true)->defaultOrder(7),
+            // Off by default: most catalogues are downloads and access, where
+            // the pointer is an id nobody reads. It earns a column only on a
+            // site that files dates and cohorts. Switching it off hides no
+            // defect: what guarantees a dangling pointer is seen is the count
+            // above the table, which no column preference can reach.
+            Column::make('ref')->label(__('statamic-products::messages.column_ref'))->sortable(false)->defaultOrder(8)->defaultVisibility(false)->visible(false),
         ]);
 
         if ($key = $this->columnPreferenceKey) {

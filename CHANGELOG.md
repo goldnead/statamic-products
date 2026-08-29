@@ -18,6 +18,30 @@ Eine Tabelle, ein Bildschirm unter **Hilfsmittel → Produkte**, und zwei Anschl
 des Zahlungs-Addons. Mehr nicht: **das Addon liefert nichts aus.** Was ein Kurs *anzeigt*, bleibt
 Sache der Website. Es sagt, dass ein Kurs existiert, was er kostet und was er öffnet.
 
+### Neu: eine Art und ein Zeiger
+
+`type` und `ref`. Sechs Arten: Download, Zugang, Termin, Sitzungen, Kohorte, Feed.
+
+**Die Art ist eine Auskunft, kein Automat.** Ein Produkt „Termin" zu nennen sagt, dass es ein
+Live-Datum ist; es reserviert keinen Platz. Bei Kajabi und Podia ist die Produktart die
+Auslieferung selbst — die Kursart *ist* der Player —, und dieser Weg endet darin, Kursplayer,
+Community-Engine, Terminverwaltung und Podcast-Hosting selbst zu bauen. Ausgeliefert wird auf der
+Website und in den Nachbar-Addons. Manche davon gibt es noch nicht.
+
+Deshalb hat ein Zeiger **drei** Zustände, nicht zwei: gefunden, weg, und *niemand hier kann es
+sagen*. Die beiden letzten zu verwechseln heißt entweder, ein einwandfreies Produkt anzuklagen,
+oder einen kaputten Zeiger durchzuwinken, weil das Paket fehlt, das ihn bemerkt hätte. Ein
+Termin-Produkt lässt sich anlegen, bevor `statamic-events` installiert ist.
+
+**Was ins Leere zeigt, wird gezählt, nicht nur markiert.** Das Abzeichen an der Zeile sagt, welches
+Produkt betroffen ist; die Zahl über der Tabelle sagt, dass überhaupt welche betroffen sind. Jede
+Spalte im Control Panel lässt sich abwählen, und ein Katalog, der sauber aussieht, weil jemand eine
+Spalte ausgeblendet hat, ist genau der stille Fehler, gegen den das Feld gebaut ist.
+
+`statamic-events` und `statamic-booking` sind optional und liegen als `require-dev` bei — damit die
+Auflösung gegen deren echte Migration und deren echtes Modell getestet wird und nicht gegen eine
+Tabelle, die dieses Addon sich selbst ausgedacht hat.
+
 ### Die Entscheidungen, die drinstecken
 
 **Die Kennung ist über alle Marken eindeutig, auch wenn die Zeile es nicht ist.** Sie steht auf

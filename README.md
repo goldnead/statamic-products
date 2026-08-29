@@ -69,6 +69,8 @@ Offer::create([
 | --- | --- |
 | `handle` | What offers, payments and invoices call it. **Unique across every brand**, and frozen once the product has been sold. |
 | `name` | What is bought. Goes into the order confirmation and onto the invoice (§ 312j BGB). |
+| `type` | What kind of thing it is. **An answer, not an instruction** — see below. |
+| `ref` | The pointer at the thing of that kind. Empty for a download. |
 | `amount_cent` | The list price. `0` is allowed and means free. An offer may undercut it; nobody else may. |
 | `currency` | Empty means the shop currency. |
 | `digital` | A tax fact, not a medium: it decides the place of supply and with it the mandatory notice (§ 3a UStG). **No default** — whoever creates a product answers it. |
@@ -79,6 +81,38 @@ Offer::create([
 What is deliberately *not* here: discounts, sales copy, placement, bundling. That is the offer
 level and it already exists in `statamic-offers`. A product has a list price and no opinion about
 how it is advertised.
+
+## The kind is an answer, not an instruction
+
+| Kind | What it is | `ref` points at |
+| --- | --- | --- |
+| `download` | PDF, workbook, recording | nothing — the thing *is* the product |
+| `zugang` | A course, a members area, a community | a Statamic entry id |
+| `termin` | Live event, workshop, concert, webinar | an event uuid in `statamic-events` |
+| `sitzungen` | A package of appointments | a booking funnel handle in `statamic-booking` |
+| `kohorte` | A programme with a start, an end and a group | a Statamic entry id |
+| `feed` | A paid podcast or newsletter | a Statamic collection handle |
+
+**Nothing here delivers anything.** Naming a product a `termin` says it is a live date; it does not
+reserve a seat. Kajabi and Podia go the other way — there the product type *is* the delivery, the
+course type *is* the player — and that road ends in building a course player, a community engine, a
+scheduler and podcast hosting. Delivery stays on the website and in the sibling addons that do that
+job. Some of them do not exist yet.
+
+Which is why an unresolvable pointer is **shown as unresolved rather than refused**. A pointer has
+three states, not two:
+
+- **resolved** — found it, and the screen shows its name.
+- **gone** — the sibling that owns that kind is installed and says there is no such thing. A real
+  defect: sold, paid, nothing behind it. Flagged on the row **and counted above the table**, because
+  every column in a Control Panel listing can be switched off and a catalogue that reads as tidy
+  because somebody hid a column is exactly the silent failure this is for.
+- **cannot be checked** — the sibling is not installed, or has not migrated. Nothing is wrong with
+  the product; nobody can confirm it either. Never flagged, because a badge that cries wolf is a
+  badge everyone learns to ignore.
+
+`statamic-events` and `statamic-booking` are optional. Install them and their pointers start being
+checked; leave them out and products for those kinds can still be filed.
 
 ## How it reaches the checkout
 

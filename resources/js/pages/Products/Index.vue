@@ -27,6 +27,9 @@ const props = defineProps({
     hasAny: { type: Boolean, default: false },
     currency: { type: String, default: 'EUR' },
     configuredHandles: { type: Array, default: () => [] },
+    types: { type: Array, default: () => [] },
+    danglingCount: { type: Number, default: 0 },
+    danglingBanner: { type: String, default: null },
     t: { type: Object, required: true },
 });
 
@@ -40,6 +43,10 @@ const props = defineProps({
  */
 const blank = () => ({
     handle: '', name: '',
+    // Null, like `digital`: the kind decides what the pointer beside it even
+    // means, so a preselected one would give that pointer a meaning nobody
+    // chose.
+    type: null, ref: '',
     amount_cent: null, currency: null,
     digital: null,
     grants: [],
@@ -87,6 +94,17 @@ const title = computed(() => (editing.value ? props.t.edit : props.t.new));
 const shadowed = computed(() => form.value.handle !== ''
     && props.configuredHandles.includes(form.value.handle));
 
+/** The kind currently chosen, with the words that belong to it. */
+const chosenType = computed(() => props.types.find((t) => t.value === form.value.type) || null);
+
+/**
+ * Whether this kind names something elsewhere.
+ *
+ * A download's thing *is* the product, so it points at nothing and the field
+ * goes away rather than sitting there empty and inviting a leftover id.
+ */
+const needsRef = computed(() => Boolean(chosenType.value?.needs_ref));
+
 /**
  * The chosen slugs, handed back to the combobox as its own options.
  *
@@ -99,6 +117,9 @@ const shadowed = computed(() => form.value.handle !== ''
  */
 const grantOptions = computed(() => (form.value.grants || [])
     .map((slug) => ({ value: slug, label: slug })));
+
+/** Whether the row being edited points at something that is gone. */
+const refMissing = computed(() => Boolean(editing.value?.ref_missing) && form.value.ref === editing.value.ref);
 
 /** Sold products keep their handle. The server refuses it either way. */
 const handleFrozen = computed(() => Boolean(editing.value && form.value.sold));
@@ -178,6 +199,13 @@ function confirmRemove() {
 
         <Alert v-if="deleteError" variant="error" :text="deleteError" class="mb-4" />
 
+        <!-- The count, above the table and outside every column preference.
+             The badge on a row says *which* product points nowhere; this says
+             *that* some do, and it survives a reader who has hidden the column
+             the badge sits on. Every column here is toggleable, the name
+             included — there is no such thing as an unhideable one. -->
+        <Alert v-if="danglingCount" variant="error" :text="danglingBanner" class="mb-4" />
+
         <EmptyStateMenu v-if="!hasAny" :heading="t.empty_heading">
             <EmptyStateItem
                 :heading="t.empty_title"
@@ -205,6 +233,10 @@ function confirmRemove() {
                 <button type="button" class="font-medium hover:text-primary" @click="edit(row)">
                     {{ row.name }}
                 </button>
+                <!-- Which product it is. Every column is toggleable, this one
+                     too, so the count above the table is what actually
+                     guarantees the defect is seen; this badge names it. -->
+                <Badge v-if="row.ref_missing" color="red" :text="t.ref_missing_badge" class="ms-2" />
             </template>
 
             <template #cell-handle="{ row }">
@@ -218,6 +250,14 @@ function confirmRemove() {
             <template #cell-amount="{ row }">
                 <span class="tabular-nums">{{ row.amount }}</span>
                 <span class="ms-1 text-2xs text-gray-500 dark:text-gray-400">{{ row.currency }}</span>
+            </template>
+
+            <template #cell-type="{ row }">
+                <span class="text-xs">{{ row.type_label }}</span>
+            </template>
+
+            <template #cell-ref="{ row }">
+                <span v-if="row.ref" class="font-mono text-xs">{{ row.ref_label || row.ref }}</span>
             </template>
 
             <template #cell-digital="{ row }">
@@ -262,6 +302,7 @@ function confirmRemove() {
 
                 <div class="flex-1 space-y-5 overflow-y-auto px-6 py-5">
                     <Alert v-if="shadowed" variant="warning" :text="t.shadowed_warning" />
+                    <Alert v-if="refMissing" variant="error" :text="t.ref_missing_warning" />
 
                     <Field :label="t.field_name" :instructions="t.field_name_help" :error="errors.name" required>
                         <Input v-model="form.name" />
@@ -304,6 +345,30 @@ function confirmRemove() {
                             {{ t.field_amount_help }} {{ t.field_currency_help }}
                         </p>
                     </div>
+
+                    <!-- The kind, and directly under it the pointer that only
+                         means anything once the kind is chosen. Two fields, one
+                         decision, so they sit together and the second explains
+                         itself in the first's words. -->
+                    <div>
+                        <Field :label="t.field_type" :instructions="t.field_type_help" :error="errors.type" required>
+                            <Select v-model="form.type" :options="types" />
+                        </Field>
+
+                        <p v-if="chosenType" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            {{ chosenType.description }}
+                        </p>
+                    </div>
+
+                    <Field
+                        v-if="needsRef"
+                        :label="chosenType.ref_label"
+                        :instructions="t.field_ref_help"
+                        :error="errors.ref"
+                        required
+                    >
+                        <Input v-model="form.ref" class="font-mono" />
+                    </Field>
 
                     <!-- No preselection, and the empty state is the point: this
                          is a tax fact, and a default would answer it on

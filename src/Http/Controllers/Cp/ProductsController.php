@@ -5,6 +5,7 @@ namespace Goldnead\StatamicProducts\Http\Controllers\Cp;
 use Goldnead\StatamicPayments\Support\Catalogue;
 use Goldnead\StatamicProducts\Http\Resources\Cp\ProductsCollection;
 use Goldnead\StatamicProducts\Models\Product;
+use Goldnead\StatamicProducts\Support\RefTarget;
 use Goldnead\StatamicProducts\Support\SoldHandles;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -37,6 +38,8 @@ class ProductsController extends CpController
             return $this->json($request);
         }
 
+        $dangling = $this->danglingCount();
+
         return Inertia::render('statamic-products::Products/Index', [
             'listingUrl' => cp_route('utilities.products'),
             'storeUrl' => cp_route('utilities.products.store'),
@@ -52,6 +55,33 @@ class ProductsController extends CpController
             // the collision is visible *while typing a handle*, rather than
             // after a purchase went through at the other price.
             'configuredHandles' => array_keys(app(Catalogue::class)->configured()),
+            // What a product can be, with the label and the one line that says
+            // what its pointer is expected to hold. Built here so the form has
+            // no vocabulary of its own to drift from the model's.
+            'types' => collect(Product::types())->map(fn (string $type) => [
+                'value' => $type,
+                'label' => __('statamic-products::messages.type_'.$type),
+                'description' => __('statamic-products::messages.type_'.$type.'_description'),
+                'ref_label' => __('statamic-products::messages.ref_'.$type),
+                'needs_ref' => in_array($type, Product::typesNeedingRef(), true),
+            ])->all(),
+            // **Eine Zahl, die sich nicht abschalten laesst.**
+            //
+            // Das Abzeichen an der Zeile sagt *welches* Produkt ins Leere
+            // zeigt, aber jede Spalte im Control Panel ist ueber den
+            // Spaltenwaehler abwaehlbar — die Namensspalte eingeschlossen. Eine
+            // Liste, die sich sauber liest, weil jemand eine Spalte ausgeblendet
+            // hat, ist genau der stille Fehler, den dieses Feld sichtbar machen
+            // soll. Also steht die Zahl darueber, wo keine Einstellung sie
+            // wegnimmt.
+            'danglingCount' => $dangling,
+            // Fertig formuliert, mit Einzahl und Mehrzahl. Der Bildschirm setzt
+            // keinen Satz zusammen — das ist dieselbe Regel, nach der jedes
+            // andere Label hier schon fertig ankommt, und sie faellt sonst
+            // genau bei dem Text um, der eine Zahl enthaelt.
+            'danglingBanner' => $dangling > 0
+                ? trans_choice('statamic-products::messages.dangling_banner', $dangling, ['count' => $dangling])
+                : null,
             't' => $this->strings(),
         ]);
     }
@@ -107,6 +137,21 @@ class ProductsController extends CpController
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:191'],
+            // Required with no fallback, like `digital` below: a kind decides
+            // what the `ref` beside it even means, so guessing one would give
+            // the pointer a meaning nobody chose.
+            'type' => ['required', Rule::in(Product::types())],
+            // **Required for the kinds that name something else, refused for a
+            // download.** A download's thing *is* the product, so a pointer on
+            // one is a leftover from a changed mind — kept, it would resolve
+            // against the wrong sibling and show a name from another product's
+            // world. It is nulled below rather than rejected, because changing
+            // a kind is a normal edit and should not need the field cleared by
+            // hand first.
+            'ref' => [
+                Rule::requiredIf(fn () => in_array($request->input('type'), Product::typesNeedingRef(), true)),
+                'nullable', 'string', 'max:191',
+            ],
             'handle' => [
                 'required', 'string', 'max:191', 'regex:/^[a-z0-9][a-z0-9_-]*$/',
                 Rule::unique('products', 'handle')->ignore($product?->getKey()),
@@ -141,6 +186,13 @@ class ProductsController extends CpController
         // `validate()` omits a nullable key that was never sent, so reading it
         // directly is a 500 on every client that leaves the field out — which
         // is every client that is not this addon's own form.
+        // A download points at nothing. See the rule above.
+        if (($data['type'] ?? null) === Product::TYPE_DOWNLOAD) {
+            $data['ref'] = null;
+        }
+
+        $data['ref'] = ($data['ref'] ?? null) === '' ? null : ($data['ref'] ?? null);
+
         $data['active'] = $request->boolean('active');
         $data['digital'] = $request->boolean('digital');
         $data['currency'] = ($data['currency'] ?? null) ? strtoupper($data['currency']) : null;
@@ -161,6 +213,27 @@ class ProductsController extends CpController
         }
 
         return $data;
+    }
+
+    /**
+     * Wie viele Produkte dieser Marke auf etwas zeigen, das es nicht gibt.
+     *
+     * Ueber den ganzen Katalog, nicht ueber die aktuelle Seite: „auf Seite drei
+     * sind zwei kaputt" ist keine Auskunft, die jemand beim Oeffnen bekommt.
+     *
+     * Der Preis dafuer ist ein Durchlauf beim Aufbau des Bildschirms — bei
+     * Terminen eine Abfrage fuer alle zusammen ({@see RefTarget::prime()}), bei
+     * Eintraegen und Collections Zugriffe auf den Stache, der ohnehin im
+     * Speicher liegt. Ein Produktkatalog hat Dutzende Zeilen, keine Millionen;
+     * waechst er, gehoert die Zahl in einen Cache und nicht weg.
+     */
+    protected function danglingCount(): int
+    {
+        $products = Product::query()->forBrand()->get();
+
+        RefTarget::prime($products);
+
+        return $products->filter(fn (Product $product) => $product->refTarget()->isMissing())->count();
     }
 
     protected function json(FilteredRequest $request)
@@ -186,6 +259,10 @@ class ProductsController extends CpController
         // is built rather than probably.
         SoldHandles::prime($page->getCollection()->pluck('handle')->all());
 
+        // Dieselbe Rechnung fuer die Zeiger: sonst kostet jede Zeile eine
+        // `Schema::hasTable()` plus eine eigene Abfrage.
+        RefTarget::prime($page->getCollection());
+
         return (new ProductsCollection($page))
             ->columnPreferenceKey('statamic-products.products.columns')
             ->additional(['meta' => ['activeFilterBadges' => $badges]]);
@@ -208,7 +285,7 @@ class ProductsController extends CpController
         $escaped = addcslashes($term, '%_\\');
 
         $query->where(function (Builder $q) use ($escaped) {
-            foreach (['name', 'handle'] as $column) {
+            foreach (['name', 'handle', 'ref'] as $column) {
                 $q->orWhereRaw($column." LIKE ? ESCAPE '\\'", ['%'.$escaped.'%']);
             }
         });
@@ -224,6 +301,7 @@ class ProductsController extends CpController
         $sortable = [
             'name' => 'name',
             'handle' => 'handle',
+            'type' => 'type',
             'amount' => 'amount_cent',
             'digital' => 'digital',
             'active' => 'active',
@@ -267,6 +345,11 @@ class ProductsController extends CpController
             'field_grants' => __('statamic-products::messages.field_grants'),
             'field_grants_help' => __('statamic-products::messages.field_grants_help'),
             'field_grants_placeholder' => __('statamic-products::messages.field_grants_placeholder'),
+            'field_type' => __('statamic-products::messages.field_type'),
+            'field_type_help' => __('statamic-products::messages.field_type_help'),
+            'field_ref_help' => __('statamic-products::messages.field_ref_help'),
+            'ref_missing_badge' => __('statamic-products::messages.ref_missing_badge'),
+            'ref_missing_warning' => __('statamic-products::messages.ref_missing_warning'),
             'field_active' => __('statamic-products::messages.field_active'),
             'shadowed_badge' => __('statamic-products::messages.shadowed_badge'),
             'shadowed_warning' => __('statamic-products::messages.shadowed_warning'),

@@ -5,6 +5,7 @@ namespace Goldnead\StatamicProducts\Tests;
 use Goldnead\StatamicPayments\Contracts\PaymentGateway;
 use Goldnead\StatamicPayments\Support\Catalogue;
 use Goldnead\StatamicProducts\ServiceProvider;
+use Goldnead\StatamicProducts\Support\RefTarget;
 use Goldnead\StatamicProducts\Support\SoldHandles;
 use Goldnead\StatamicProducts\Tests\Support\FakeGateway;
 use Statamic\Testing\AddonTestCase;
@@ -51,11 +52,13 @@ abstract class TestCase extends AddonTestCase
 
     protected function tearDown(): void
     {
-        // Both are static, so one test's catalogue — and one test's idea of
-        // which handles have been sold — would otherwise still be answering in
+        // All three are static, so one test's catalogue, one test's idea of
+        // which handles have been sold, and one test's idea of whether
+        // `statamic-events` is migrated would otherwise still be answering in
         // the next.
         Catalogue::forgetResolvers();
         SoldHandles::forget();
+        RefTarget::forget();
 
         parent::tearDown();
     }

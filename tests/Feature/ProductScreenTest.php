@@ -43,6 +43,7 @@ class ProductScreenTest extends TestCase
         return array_merge([
             'handle' => 'atemkurs',
             'name' => 'Atemkurs',
+            'type' => Product::TYPE_DOWNLOAD,
             'amount_cent' => 4900,
             'digital' => true,
             'active' => true,

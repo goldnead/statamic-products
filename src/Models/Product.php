@@ -6,6 +6,7 @@ use Goldnead\StatamicPayments\Models\Payment;
 use Goldnead\StatamicPayments\Models\PaymentItem;
 use Goldnead\StatamicPayments\Support\Brands;
 use Goldnead\StatamicPayments\Support\Catalogue;
+use Goldnead\StatamicProducts\Support\RefTarget;
 use Goldnead\StatamicProducts\Support\SoldHandles;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -24,6 +25,8 @@ use Throwable;
  * @property int $id
  * @property string $handle
  * @property string $name
+ * @property string $type
+ * @property string|null $ref
  * @property int $amount_cent
  * @property string|null $currency
  * @property bool $digital
@@ -37,7 +40,60 @@ use Throwable;
  */
 class Product extends Model
 {
+    /** A file handed over. Points at nothing. */
+    public const TYPE_DOWNLOAD = 'download';
+
+    /** A course, a members area, a community. Points at a Statamic entry. */
+    public const TYPE_ZUGANG = 'zugang';
+
+    /** A live date: workshop, concert, webinar. Points at a `statamic-events` uuid. */
+    public const TYPE_TERMIN = 'termin';
+
+    /** A package of sessions. Points at a `statamic-booking` funnel handle. */
+    public const TYPE_SITZUNGEN = 'sitzungen';
+
+    /** A programme with a start, an end and a group. Points at a Statamic entry. */
+    public const TYPE_KOHORTE = 'kohorte';
+
+    /** A paid podcast or newsletter. Points at a Statamic collection handle. */
+    public const TYPE_FEED = 'feed';
+
     protected $guarded = [];
+
+    /**
+     * The kinds a product may be.
+     *
+     * **Each one is an answer, never an instruction.** Naming a product a
+     * `termin` says it is a live date; nothing in this addon reserves a seat
+     * because of it. Delivery lives on the website and in sibling addons — some
+     * of which are not built yet — and the day one of them wants to act on a
+     * kind, it reads this field and does so itself.
+     *
+     * @return list<string>
+     */
+    public static function types(): array
+    {
+        return [
+            self::TYPE_DOWNLOAD,
+            self::TYPE_ZUGANG,
+            self::TYPE_TERMIN,
+            self::TYPE_SITZUNGEN,
+            self::TYPE_KOHORTE,
+            self::TYPE_FEED,
+        ];
+    }
+
+    /**
+     * Kinds that name a thing somewhere else, and therefore need a pointer.
+     *
+     * A download is the only one that does not: the thing *is* the product.
+     *
+     * @return list<string>
+     */
+    public static function typesNeedingRef(): array
+    {
+        return array_values(array_diff(self::types(), [self::TYPE_DOWNLOAD]));
+    }
 
     protected function casts(): array
     {
@@ -208,6 +264,17 @@ class Product extends Model
 
             return true;
         }
+    }
+
+    /**
+     * What this product's `ref` points at, if anything can say.
+     *
+     * Three states, not two: found, gone, and nobody-here-can-tell. See
+     * {@see RefTarget}.
+     */
+    public function refTarget(): RefTarget
+    {
+        return RefTarget::for($this);
     }
 
     /** The price as a decimal string: always a dot, always two decimals. */

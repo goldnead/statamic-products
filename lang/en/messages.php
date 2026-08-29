@@ -45,6 +45,37 @@ return [
     'field_grants_help' => 'What a paid copy opens. More than one is fine; empty means nothing.',
     'field_grants_placeholder' => 'Add access',
 
+    'column_type' => 'Kind',
+    'column_ref' => 'Points at',
+
+    'field_type' => 'Kind',
+    'field_type_help' => 'An answer, not an instruction: delivery happens on the website.',
+    'field_ref_help' => 'Points at the thing of that kind. Empty for a download.',
+
+    'type_download' => 'Download',
+    'type_download_description' => 'PDF, workbook, recording. The thing is the file itself.',
+    'type_zugang' => 'Access',
+    'type_zugang_description' => 'A course, a members area, a community.',
+    'type_termin' => 'Date',
+    'type_termin_description' => 'Live event, workshop, concert, webinar.',
+    'type_sitzungen' => 'Sessions',
+    'type_sitzungen_description' => 'A package of several appointments, one to one or in a group.',
+    'type_kohorte' => 'Cohort',
+    'type_kohorte_description' => 'A programme with a start, an end and a fixed group.',
+    'type_feed' => 'Feed',
+    'type_feed_description' => 'A paid podcast or newsletter.',
+
+    'ref_download' => 'No target',
+    'ref_zugang' => 'Statamic entry (ID)',
+    'ref_termin' => 'Event from statamic-events (UUID)',
+    'ref_sitzungen' => 'Booking funnel from statamic-booking (handle)',
+    'ref_kohorte' => 'Statamic entry (ID)',
+    'ref_feed' => 'Statamic collection (handle)',
+
+    'dangling_banner' => '{1} One product points at something that does not exist. Sold like that, the buyer pays and gets nothing.|[2,*] :count products point at something that does not exist. Sold like that, the buyer pays and gets nothing.',
+    'ref_missing_badge' => 'Target gone',
+    'ref_missing_warning' => 'What this identifier points at does not exist. Sold like this, the buyer pays and gets nothing behind it — and nobody notices, because no error happens.',
+
     'field_active' => 'Active',
 
     'shadowed_badge' => 'From config',
