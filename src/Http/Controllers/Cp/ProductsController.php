@@ -1,0 +1,282 @@
+<?php
+
+namespace Goldnead\StatamicProducts\Http\Controllers\Cp;
+
+use Goldnead\StatamicPayments\Support\Catalogue;
+use Goldnead\StatamicProducts\Http\Resources\Cp\ProductsCollection;
+use Goldnead\StatamicProducts\Models\Product;
+use Goldnead\StatamicProducts\Support\SoldHandles;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Statamic\Http\Controllers\CP\CpController;
+use Statamic\Http\Requests\FilteredRequest;
+use Statamic\Query\Scopes\Filters\Concerns\QueriesFilters;
+use Statamic\Statamic;
+
+/**
+ * Products in the Control Panel.
+ *
+ * The screen this addon exists for. Until now the only place a price could be
+ * changed was a config file, which meant a deploy, which meant a developer.
+ */
+class ProductsController extends CpController
+{
+    use QueriesFilters;
+
+    public const SCOPE = 'statamic-products-products';
+
+    public function index(FilteredRequest $request)
+    {
+        $this->authorizeAccess();
+
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->json($request);
+        }
+
+        return Inertia::render('statamic-products::Products/Index', [
+            'listingUrl' => cp_route('utilities.products'),
+            'storeUrl' => cp_route('utilities.products.store'),
+            'sortColumn' => 'name',
+            'sortDirection' => 'asc',
+            // Scoped like the listing itself. Unscoped, a brand with no
+            // products of its own gets the listing's flat "no results" instead
+            // of the empty state that explains what a product is and offers to
+            // make one — because somebody else's catalogue exists.
+            'hasAny' => Product::query()->forBrand()->exists(),
+            'currency' => (string) config('statamic-payments.currency', 'EUR'),
+            // The handles the config file already claims. Handed to the form so
+            // the collision is visible *while typing a handle*, rather than
+            // after a purchase went through at the other price.
+            'configuredHandles' => array_keys(app(Catalogue::class)->configured()),
+            't' => $this->strings(),
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $this->authorizeAccess();
+
+        $product = Product::create($this->validated($request));
+
+        return back()->with('message', __('statamic-products::messages.saved', ['name' => $product->name]));
+    }
+
+    public function update(Request $request, Product $product)
+    {
+        $this->authorizeAccess();
+
+        $product->update($this->validated($request, $product));
+
+        return back()->with('message', __('statamic-products::messages.saved', ['name' => $product->name]));
+    }
+
+    public function destroy(Request $request, Product $product)
+    {
+        $this->authorizeAccess();
+
+        // **Sold products are never deleted, only retired.** The handle is on
+        // payment rows and invoice lines that still have to render; deleting
+        // the row behind it is how an old invoice starts showing a blank line.
+        // Refused rather than silently turned into a deactivation, because a
+        // delete button that quietly does something else is worse than one that
+        // says no.
+        if ($product->hasBeenSold()) {
+            throw ValidationException::withMessages([
+                'handle' => __('statamic-products::messages.delete_refused_sold'),
+            ]);
+        }
+
+        $product->delete();
+
+        return back()->with('message', __('statamic-products::messages.deleted'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function validated(Request $request, ?Product $product = null): array
+    {
+        // Null unless money has already moved under this name, in which case
+        // it is the one value the field may still hold. See
+        // `Product::hasBeenSold()` for why a handle stops being editable.
+        $frozenHandle = $product !== null && $product->hasBeenSold() ? $product->handle : null;
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:191'],
+            'handle' => [
+                'required', 'string', 'max:191', 'regex:/^[a-z0-9][a-z0-9_-]*$/',
+                Rule::unique('products', 'handle')->ignore($product?->getKey()),
+                ...($frozenHandle !== null ? [Rule::in([$frozenHandle])] : []),
+            ],
+            // `min:0`, not `min:1`. Zero is a real price — the lead magnet, the
+            // sample chapter — and the catalogue has allowed it since refusing
+            // free things pushed every free thing outside the addon.
+            //
+            // `integer` and not `numeric`: nobody may post "49,00" and have it
+            // read as 49 cents.
+            'amount_cent' => ['required', 'integer', 'min:0'],
+            'currency' => ['nullable', 'string', 'size:3'],
+            // **Required with no default, and that is the point of the field.**
+            // It decides the place of supply and with it the mandatory tax
+            // notice (§ 3a UStG). Any default is wrong for half a catalogue,
+            // and a wrong default here surfaces as a tax line nobody checked.
+            // `false` counts as present for `required`, so both answers pass
+            // and only silence fails.
+            'digital' => ['required', 'boolean'],
+            'grants' => ['nullable', 'array'],
+            // `nullable`, because core's `ConvertEmptyStringsToNull` middleware
+            // has already turned the blank rows of a half-filled repeater into
+            // nulls by the time this runs. Without it an empty row is a 422 on
+            // a form the person filled in correctly. They are dropped below.
+            'grants.*' => ['nullable', 'string', 'max:191'],
+            'active' => ['boolean'],
+        ], [
+            'handle.in' => __('statamic-products::messages.handle_frozen'),
+        ]);
+
+        // `validate()` omits a nullable key that was never sent, so reading it
+        // directly is a 500 on every client that leaves the field out — which
+        // is every client that is not this addon's own form.
+        $data['active'] = $request->boolean('active');
+        $data['digital'] = $request->boolean('digital');
+        $data['currency'] = ($data['currency'] ?? null) ? strtoupper($data['currency']) : null;
+
+        // Duplicates would grant the same access twice and log it twice; blanks
+        // come from a half-filled repeater and reach the entitlements bridge as
+        // a slug that opens nothing.
+        $data['grants'] = array_values(array_unique(array_filter(
+            (array) ($data['grants'] ?? []),
+            static fn (mixed $slug): bool => is_string($slug) && trim($slug) !== '',
+        )));
+
+        // Empty means "opens nothing", and that belongs in the column as `null`
+        // rather than `[]`. An empty array is a statement; `null` is the absence
+        // of one, and the column is nullable because that is the normal case.
+        if ($data['grants'] === []) {
+            $data['grants'] = null;
+        }
+
+        return $data;
+    }
+
+    protected function json(FilteredRequest $request)
+    {
+        $query = Product::query()->forBrand();
+
+        if ($search = trim((string) $request->get('search', ''))) {
+            $this->applySearch($query, $search);
+        }
+
+        $badges = $this->queryFilters($query, $request->filters, ['scope' => self::SCOPE]);
+
+        [$column, $direction] = $this->order($request);
+        $query->orderBy($column, $direction);
+
+        $page = $query->paginate(Statamic::cpPerPage($request->get('perPage')));
+
+        // Two queries for the page instead of two per row. Every row asks
+        // whether its handle has taken money — the answer decides whether the
+        // handle field is locked — and twenty-five rows asking separately is
+        // fifty queries for a question that is one `whereIn`. Primed here and
+        // not inside the resource, so it is certainly done before the first row
+        // is built rather than probably.
+        SoldHandles::prime($page->getCollection()->pluck('handle')->all());
+
+        return (new ProductsCollection($page))
+            ->columnPreferenceKey('statamic-products.products.columns')
+            ->additional(['meta' => ['activeFilterBadges' => $badges]]);
+    }
+
+    protected function authorizeAccess(): void
+    {
+        // Through the Gate, where `Utility::register` puts the permission and
+        // where the route's `can:` middleware looks.
+        abort_unless(Gate::allows('access products utility'), 403);
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     */
+    protected function applySearch(Builder $query, string $term): void
+    {
+        // `%` and `_` are LIKE wildcards; the ESCAPE clause is spelled out
+        // because SQLite, unlike MySQL and Postgres, has no default one.
+        $escaped = addcslashes($term, '%_\\');
+
+        $query->where(function (Builder $q) use ($escaped) {
+            foreach (['name', 'handle'] as $column) {
+                $q->orWhereRaw($column." LIKE ? ESCAPE '\\'", ['%'.$escaped.'%']);
+            }
+        });
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    protected function order(FilteredRequest $request): array
+    {
+        // A positive list: `sort` comes from the query string and would
+        // otherwise order by any column in the table.
+        $sortable = [
+            'name' => 'name',
+            'handle' => 'handle',
+            'amount' => 'amount_cent',
+            'digital' => 'digital',
+            'active' => 'active',
+        ];
+
+        $requested = (string) $request->get('sort', 'name');
+        $direction = strtolower((string) $request->get('order', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        return [$sortable[$requested] ?? 'name', $direction];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function strings(): array
+    {
+        return [
+            'title' => __('statamic-products::messages.utility_title'),
+            'utilities' => __('Utilities'),
+            'empty_heading' => __('statamic-products::messages.empty_heading'),
+            'empty_title' => __('statamic-products::messages.empty_title'),
+            'empty_description' => __('statamic-products::messages.empty_description'),
+            'new' => __('statamic-products::messages.new_product'),
+            'edit' => __('statamic-products::messages.edit_product'),
+            'delete_title' => __('statamic-products::messages.delete_title'),
+            'delete_body' => __('statamic-products::messages.delete_body', ['name' => ':name']),
+            'delete_refused_sold' => __('statamic-products::messages.delete_refused_sold'),
+            'field_name' => __('statamic-products::messages.field_name'),
+            'field_name_help' => __('statamic-products::messages.field_name_help'),
+            'field_handle' => __('statamic-products::messages.field_handle'),
+            'field_handle_help' => __('statamic-products::messages.field_handle_help'),
+            'handle_frozen' => __('statamic-products::messages.handle_frozen'),
+            'field_amount' => __('statamic-products::messages.field_amount'),
+            'field_amount_help' => __('statamic-products::messages.field_amount_help'),
+            'field_currency' => __('statamic-products::messages.field_currency'),
+            'field_currency_help' => __('statamic-products::messages.field_currency_help'),
+            'field_digital' => __('statamic-products::messages.field_digital'),
+            'field_digital_help' => __('statamic-products::messages.field_digital_help'),
+            'digital_yes' => __('statamic-products::messages.digital_yes'),
+            'digital_no' => __('statamic-products::messages.digital_no'),
+            'field_grants' => __('statamic-products::messages.field_grants'),
+            'field_grants_help' => __('statamic-products::messages.field_grants_help'),
+            'field_grants_placeholder' => __('statamic-products::messages.field_grants_placeholder'),
+            'field_active' => __('statamic-products::messages.field_active'),
+            'shadowed_badge' => __('statamic-products::messages.shadowed_badge'),
+            'shadowed_warning' => __('statamic-products::messages.shadowed_warning'),
+            'sold_note' => __('statamic-products::messages.sold_note'),
+            'yes' => __('statamic-products::messages.yes'),
+            'no' => __('statamic-products::messages.no'),
+            'save' => __('Save'),
+            'cancel' => __('Cancel'),
+            'edit_action' => __('Edit'),
+            'delete_action' => __('Delete'),
+        ];
+    }
+}

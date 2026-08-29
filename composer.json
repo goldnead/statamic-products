@@ -1,0 +1,62 @@
+{
+  "name": "goldnead/statamic-products",
+  "description": "Products for Statamic: the thing that is sold, with a name, a list price and the access it grants. The piece between a price tag in a config file and an entitlement.",
+  "type": "statamic-addon",
+  "license": "proprietary",
+  "authors": [
+    {
+      "name": "Adrian Goldner"
+    }
+  ],
+  "require": {
+    "php": "^8.2",
+    "statamic/cms": "^6.0",
+    "goldnead/statamic-payments": "^1.15"
+  },
+  "require-dev": {
+    "larastan/larastan": "^3.0",
+    "laravel/pint": "^1.18",
+    "orchestra/testbench": "^10.0 || ^11.0",
+    "phpunit/phpunit": "^11.0 || ^12.0",
+    "goldnead/statamic-brand-context": "^1.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "Goldnead\\StatamicProducts\\": "src"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Goldnead\\StatamicProducts\\Tests\\": "tests"
+    }
+  },
+  "extra": {
+    "statamic": {
+      "name": "Statamic Products",
+      "description": "The thing that is sold: a name, a list price, and the access it grants."
+    },
+    "laravel": {
+      "providers": [
+        "Goldnead\\StatamicProducts\\ServiceProvider"
+      ]
+    }
+  },
+  "config": {
+    "allow-plugins": {
+      "pixelfear/composer-dist-plugin": true
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true,
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../statamic-payments",
+      "options": {
+        "versions": {
+          "goldnead/statamic-payments": "1.15.0"
+        }
+      }
+    }
+  ]
+}
