@@ -47,11 +47,28 @@ final class SoldHandles
         }
 
         try {
+            // **Paid, not merely started.** `Checkout::start()` writes both
+            // tables before it calls the provider, at status `initiated`, and
+            // nothing clears those rows by default. Counting them froze a
+            // handle because somebody opened a checkout and closed the tab.
+            // Kept byte-for-byte in step with `Product::hasBeenSold()`: two
+            // spellings of one rule is how a listing and a form come to
+            // disagree about the same product.
             $sold = array_merge(
-                PaymentItem::query()->whereIn('product', $handles)->distinct()->pluck('product')->all(),
+                PaymentItem::query()
+                    ->whereIn('product', $handles)
+                    ->whereHas('payment', fn ($query) => $query->where('status', Payment::STATUS_PAID))
+                    ->distinct()
+                    ->pluck('product')
+                    ->all(),
                 // The single-product column from before line items existed. Rows
                 // written then are exactly the old ones this guard is for.
-                Payment::query()->whereIn('product', $handles)->distinct()->pluck('product')->all(),
+                Payment::query()
+                    ->whereIn('product', $handles)
+                    ->where('status', Payment::STATUS_PAID)
+                    ->distinct()
+                    ->pluck('product')
+                    ->all(),
             );
         } catch (Throwable $e) {
             Log::warning('statamic-products: could not read the payment tables; every handle on this screen is treated as sold and stays put.', [

@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.2.0 — 2026-08-30
+
+### Behoben: ein abgebrochener Kauf fror die Kennung für immer ein
+
+`hasBeenSold()` fragte, ob **irgendeine** Zahlungszeile die Kennung trägt. `Checkout::start()`
+schreibt aber die `payments`-Zeile und ihre `payment_items` **bevor** es den Anbieter aufruft, mit
+Status `initiated` — und `prune_unpaid_after_days` steht ab Werk auf `0`, also räumt sie niemand
+weg.
+
+Folge: Ein Besucher öffnet den Bezahlvorgang und schließt den Tab. Danach ist die Kennung des
+Produkts gesperrt und Löschen wird verweigert, dauerhaft, für ein Produkt, das nie jemand gekauft
+hat. Der Grund war nirgends sichtbar — die Meldung sagt „wurde schon verkauft".
+
+Jetzt zählt nur noch `status = paid`. Eine Erstattung hebt die Sperre nicht auf: Erstattungen sind
+Spalten auf einer bezahlten Zeile, der Status bleibt `paid`, und die Rechnung existiert weiter.
+
+### Behoben: ein PATCH ohne `active` oder `grants` löschte beide, still, mit 200
+
+`$request->boolean()` liest einen fehlenden Schlüssel als `false`, und `(array) null` ist `[]`. Wer
+per PATCH nur den Preis änderte, schaltete damit das Produkt ab und warf seine Zugänge weg — und
+bekam `200` zurück. Das eigene Formular schickt immer alle Felder, deshalb ist es dort nie
+aufgefallen.
+
+Jetzt wird nur geschrieben, was tatsächlich gesendet wurde. `grants: []` bleibt eine Aussage und
+leert weiterhin.
+
+**Beide Fehler waren an einer grünen Testsuite vorbeigekommen**, weil jedes Fixture mit `paid`
+zahlte und kein Test ein Teil-PATCH schickte. Fünf Tests dazu, gegengeprüft: gegen den alten Stand
+werden sie rot.
+
+Gefunden beim Schreiben der Dokumentation — von einem Agenten, der die Prosa gegen den Code prüfte.
+
 ## 1.1.0 — 2026-08-30
 
 ### Behoben: die Arten hießen auf Deutsch, gespeichert wird in dieser Familie Englisch

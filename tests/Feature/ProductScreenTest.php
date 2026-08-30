@@ -5,6 +5,7 @@ namespace Goldnead\StatamicProducts\Tests\Feature;
 use Goldnead\StatamicPayments\Models\Payment;
 use Goldnead\StatamicPayments\Models\PaymentItem;
 use Goldnead\StatamicProducts\Models\Product;
+use Goldnead\StatamicProducts\Support\SoldHandles;
 use Goldnead\StatamicProducts\Tests\TestCase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
@@ -53,6 +54,33 @@ class ProductScreenTest extends TestCase
     protected function product(array $overrides = []): Product
     {
         return Product::create($this->valid(array_merge(['handle' => 'bestand', 'name' => 'Bestand'], $overrides)));
+    }
+
+    /**
+     * A checkout somebody started and never finished.
+     *
+     * `Checkout::start()` writes both tables before it calls the provider, at
+     * status `initiated`, and nothing clears those rows by default
+     * (`prune_unpaid_after_days` ships at 0).
+     */
+    protected function abandon(string $handle): void
+    {
+        $payment = Payment::create([
+            'product' => $handle,
+            'provider_id' => 'tr_abgebrochen_'.$handle,
+            'amount_cent' => 4900,
+            'currency' => 'EUR',
+            'status' => Payment::STATUS_INITIATED,
+            'provider' => 'fake',
+        ]);
+
+        PaymentItem::create([
+            'payment_id' => $payment->id,
+            'product' => $handle,
+            'name' => 'Nie bezahlt',
+            'amount_cent' => 4900,
+            'kind' => PaymentItem::KIND_PRIMARY,
+        ]);
     }
 
     protected function sell(string $handle): void
@@ -230,6 +258,100 @@ class ProductScreenTest extends TestCase
     }
 
     #[Test]
+    public function an_abandoned_checkout_does_not_freeze_the_handle(): void
+    {
+        // **The trap this guard walked into.** A visitor opens the checkout and
+        // closes the tab. That writes a payment and its line at `initiated`,
+        // and nothing prunes them. Counting those rows locked the handle and
+        // made deletion refuse for ever, for a product nobody ever bought.
+        $product = $this->product(['handle' => 'atemkurs']);
+        $this->abandon('atemkurs');
+
+        $this->assertFalse($product->fresh()->hasBeenSold());
+
+        $this->actingAs($this->user())
+            ->patchJson('/cp/utilities/products/'.$product->id, $this->valid(['handle' => 'atemkurs-neu']))
+            ->assertRedirect();
+
+        $this->assertSame('atemkurs-neu', $product->fresh()->handle);
+    }
+
+    #[Test]
+    public function an_abandoned_checkout_does_not_block_deletion(): void
+    {
+        $product = $this->product(['handle' => 'atemkurs']);
+        $this->abandon('atemkurs');
+
+        $this->actingAs($this->user())
+            ->deleteJson('/cp/utilities/products/'.$product->id)
+            ->assertRedirect();
+
+        $this->assertSame(0, Product::count());
+    }
+
+    #[Test]
+    public function the_listing_batch_agrees_with_the_single_row_check(): void
+    {
+        // Two spellings of one rule is how a listing and a form come to
+        // disagree about the same product: the row would offer an edit the
+        // save then refuses, or the other way round.
+        $this->product(['handle' => 'bezahlt', 'name' => 'Bezahlt']);
+        $this->product(['handle' => 'abgebrochen', 'name' => 'Abgebrochen']);
+        $this->sell('bezahlt');
+        $this->abandon('abgebrochen');
+
+        $rows = collect(
+            $this->actingAs($this->user())->getJson('/cp/utilities/products')->assertOk()->json('data')
+        )->keyBy('handle');
+
+        $this->assertTrue($rows['bezahlt']['edit_values']['sold']);
+        $this->assertFalse($rows['abgebrochen']['edit_values']['sold']);
+    }
+
+    #[Test]
+    public function a_patch_that_omits_a_field_does_not_erase_it(): void
+    {
+        // **Silently destructive, and it answered 200.** `$request->boolean()`
+        // reads an absent key as false and `(array) null` is `[]`, so a client
+        // that patched only the price switched the product off and threw away
+        // its access slugs. The addon's own form sends everything, so the form
+        // never saw this.
+        $product = $this->product([
+            'handle' => 'atemkurs',
+            'active' => true,
+            'grants' => ['atemkurs-zugang', 'community'],
+        ]);
+
+        $this->actingAs($this->user())
+            ->patchJson('/cp/utilities/products/'.$product->id, [
+                'name' => 'Atemkurs',
+                'handle' => 'atemkurs',
+                'type' => Product::TYPE_DOWNLOAD,
+                'amount_cent' => 5900,
+                'digital' => true,
+            ])
+            ->assertRedirect();
+
+        $product->refresh();
+        $this->assertSame(5900, $product->amount_cent, 'the change that was sent did not land');
+        $this->assertTrue($product->active, 'an omitted `active` switched the product off');
+        $this->assertSame(['atemkurs-zugang', 'community'], $product->grants, 'an omitted `grants` erased the access slugs');
+    }
+
+    #[Test]
+    public function sending_an_empty_grants_list_still_clears_it(): void
+    {
+        // Absent is not empty. Somebody who really means "opens nothing" says so.
+        $product = $this->product(['handle' => 'atemkurs', 'grants' => ['weg-damit']]);
+
+        $this->actingAs($this->user())
+            ->patchJson('/cp/utilities/products/'.$product->id, $this->valid(['grants' => []]))
+            ->assertRedirect();
+
+        $this->assertNull($product->fresh()->grants);
+    }
+
+    #[Test]
     public function a_sale_recorded_on_the_old_single_product_column_counts_too(): void
     {
         // `payments.product` predates line items, and rows written then are
@@ -244,6 +366,8 @@ class ProductScreenTest extends TestCase
             'status' => Payment::STATUS_PAID,
             'provider' => 'fake',
         ]);
+
+        SoldHandles::forget();
 
         $this->assertTrue($product->hasBeenSold());
     }

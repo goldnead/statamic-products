@@ -221,13 +221,24 @@ class Product extends Model
     }
 
     /**
-     * Whether this handle has ever been paid for.
+     * Whether this handle has ever been **paid** for.
      *
      * A handle is a name in version-less places: it sits on payment rows and
      * invoice lines that have to render years from now, and none of them can be
      * migrated when somebody tidies up a spelling. Renaming after a sale
      * therefore does not break anything loudly — it makes an old invoice show a
      * line whose product cannot be found any more.
+     *
+     * **Paid, not merely started, and that distinction is the whole method.**
+     * `Checkout::start()` writes a `payments` row and its `payment_items`
+     * *before* it calls the provider, at status `initiated`. Matching any row
+     * meant one abandoned checkout froze the handle and made deletion refuse —
+     * for ever, because `prune_unpaid_after_days` ships at `0` and nothing
+     * clears those rows. A visitor who opened the checkout and closed the tab
+     * could permanently lock a product nobody ever bought.
+     *
+     * A refund does not unfreeze it: refunds are columns on a paid row, the
+     * status stays `paid`, and the invoice still exists.
      *
      * Both tables are asked. `payments.product` is the single-product column
      * from before line items existed, and rows written then are exactly the old
@@ -254,8 +265,14 @@ class Product extends Model
         // is "assume it was sold" and refuse the rename. The alternative lets a
         // transient database error unlock the one edit that cannot be undone.
         try {
-            return PaymentItem::query()->where('product', $handle)->exists()
-                || Payment::query()->where('product', $handle)->exists();
+            return Payment::query()
+                ->where('product', $handle)
+                ->where('status', Payment::STATUS_PAID)
+                ->exists()
+                || PaymentItem::query()
+                    ->where('product', $handle)
+                    ->whereHas('payment', fn ($query) => $query->where('status', Payment::STATUS_PAID))
+                    ->exists();
         } catch (Throwable $e) {
             Log::warning('statamic-products: could not check whether a product has been sold; treating it as sold so its handle stays put.', [
                 'handle' => $handle,

@@ -183,9 +183,6 @@ class ProductsController extends CpController
             'handle.in' => __('statamic-products::messages.handle_frozen'),
         ]);
 
-        // `validate()` omits a nullable key that was never sent, so reading it
-        // directly is a 500 on every client that leaves the field out — which
-        // is every client that is not this addon's own form.
         // A download points at nothing. See the rule above.
         if (($data['type'] ?? null) === Product::TYPE_DOWNLOAD) {
             $data['ref'] = null;
@@ -193,23 +190,43 @@ class ProductsController extends CpController
 
         $data['ref'] = ($data['ref'] ?? null) === '' ? null : ($data['ref'] ?? null);
 
-        $data['active'] = $request->boolean('active');
+        // **Only what was actually sent.** `$request->boolean()` answers false
+        // for a key that is absent, so a PATCH that simply left `active` out
+        // used to store `false`, drop the product out of the catalogue and
+        // answer 200. The addon's own form sends every field, so the form never
+        // saw it; anything else patching a price did.
+        //
+        // `digital` is not in this list because it is `required`: it is either
+        // present or the request never got here.
         $data['digital'] = $request->boolean('digital');
         $data['currency'] = ($data['currency'] ?? null) ? strtoupper($data['currency']) : null;
 
-        // Duplicates would grant the same access twice and log it twice; blanks
-        // come from a half-filled repeater and reach the entitlements bridge as
-        // a slug that opens nothing.
-        $data['grants'] = array_values(array_unique(array_filter(
-            (array) ($data['grants'] ?? []),
-            static fn (mixed $slug): bool => is_string($slug) && trim($slug) !== '',
-        )));
+        if ($request->has('active')) {
+            $data['active'] = $request->boolean('active');
+        } else {
+            unset($data['active']);
+        }
 
-        // Empty means "opens nothing", and that belongs in the column as `null`
-        // rather than `[]`. An empty array is a statement; `null` is the absence
-        // of one, and the column is nullable because that is the normal case.
-        if ($data['grants'] === []) {
-            $data['grants'] = null;
+        // Same rule as `active`: a key nobody sent is not a key somebody
+        // emptied. Sending `grants: []` *is* a statement and still clears them.
+        if ($request->has('grants')) {
+            // Duplicates would grant the same access twice and log it twice;
+            // blanks come from a half-filled repeater and reach the entitlements
+            // bridge as a slug that opens nothing.
+            $data['grants'] = array_values(array_unique(array_filter(
+                (array) ($data['grants'] ?? []),
+                static fn (mixed $slug): bool => is_string($slug) && trim($slug) !== '',
+            )));
+
+            // Empty means "opens nothing", and that belongs in the column as
+            // `null` rather than `[]`. An empty array is a statement; `null` is
+            // the absence of one, and the column is nullable because that is the
+            // normal case.
+            if ($data['grants'] === []) {
+                $data['grants'] = null;
+            }
+        } else {
+            unset($data['grants']);
         }
 
         return $data;
