@@ -87,13 +87,13 @@ how it is advertised.
 | Kind | What it is | `ref` points at |
 | --- | --- | --- |
 | `download` | PDF, workbook, recording | nothing — the thing *is* the product |
-| `zugang` | A course, a members area, a community | a Statamic entry id |
-| `termin` | Live event, workshop, concert, webinar | an event uuid in `statamic-events` |
-| `sitzungen` | A package of appointments | a booking funnel handle in `statamic-booking` |
-| `kohorte` | A programme with a start, an end and a group | a Statamic entry id |
+| `access` | A course, a members area, a community | a Statamic entry id |
+| `event` | Live event, workshop, concert, webinar | an event uuid in `statamic-events` |
+| `sessions` | A package of appointments | a booking funnel handle in `statamic-booking` |
+| `cohort` | A programme with a start, an end and a group | a Statamic entry id |
 | `feed` | A paid podcast or newsletter | a Statamic collection handle |
 
-**Nothing here delivers anything.** Naming a product a `termin` says it is a live date; it does not
+**Nothing here delivers anything.** Naming a product an `event` says it is a live date; it does not
 reserve a seat. Kajabi and Podia go the other way — there the product type *is* the delivery, the
 course type *is* the player — and that road ends in building a course player, a community engine, a
 scheduler and podcast hosting. Delivery stays on the website and in the sibling addons that do that

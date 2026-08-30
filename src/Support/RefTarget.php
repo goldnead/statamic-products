@@ -82,7 +82,7 @@ final class RefTarget
             $wanted[$product->type][$ref] = true;
         }
 
-        self::primeEvents(array_keys($wanted[Product::TYPE_TERMIN] ?? []));
+        self::primeEvents(array_keys($wanted[Product::TYPE_EVENT] ?? []));
 
         // **Entries, collections and booking funnels are deliberately not
         // batched**, and that is a decision rather than an omission.
@@ -135,10 +135,10 @@ final class RefTarget
 
         try {
             $target = match ($product->type) {
-                Product::TYPE_ZUGANG, Product::TYPE_KOHORTE => self::entry($ref),
+                Product::TYPE_ACCESS, Product::TYPE_COHORT => self::entry($ref),
                 Product::TYPE_FEED => self::collection($ref),
-                Product::TYPE_TERMIN => self::event($ref),
-                Product::TYPE_SITZUNGEN => self::bookingEndpoint($ref),
+                Product::TYPE_EVENT => self::event($ref),
+                Product::TYPE_SESSIONS => self::bookingEndpoint($ref),
                 // A kind nobody taught this class about. Unknowable rather than
                 // missing: the row is not wrong, this method is behind.
                 default => new self(self::UNKNOWABLE),
@@ -172,7 +172,7 @@ final class RefTarget
         foreach ($uuids as $uuid) {
             $title = $titles[$uuid] ?? null;
 
-            self::$memo[Product::TYPE_TERMIN.'|'.$uuid] = $title === null
+            self::$memo[Product::TYPE_EVENT.'|'.$uuid] = $title === null
                 ? new self(self::MISSING)
                 : new self(self::RESOLVED, (string) $title);
         }

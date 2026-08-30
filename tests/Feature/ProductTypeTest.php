@@ -114,6 +114,41 @@ class ProductTypeTest extends TestCase
     }
 
     #[Test]
+    public function the_german_kinds_from_1_0_0_are_rewritten_to_english(): void
+    {
+        // 1.0.0 shipped `zugang`, `termin`, `sitzungen` and `kohorte` while every
+        // sibling stores English. A row written by that version has to arrive on
+        // the new value, or `RefTarget` quietly answers "unknowable" for it and
+        // stops checking its pointer at all — the silent half of a failure.
+        foreach (['zugang' => 'access', 'termin' => 'event', 'sitzungen' => 'sessions', 'kohorte' => 'cohort'] as $alt => $neu) {
+            DB::table('products')->insert([
+                'handle' => 'alt-'.$alt,
+                'name' => 'Alt '.$alt,
+                'type' => $alt,
+                'ref' => 'irgendwas',
+                'amount_cent' => 1000,
+                'digital' => true,
+                'active' => true,
+                'brand_id' => 0,
+            ]);
+        }
+
+        // Die Migration selbst, nicht `artisan migrate`: die Suite hat sie in
+        // `setUp()` schon gefahren, und ein zweiter Lauf taete nichts.
+        (require __DIR__.'/../../database/migrations/2026_08_30_170000_rename_product_types_to_english.php')->up();
+
+        foreach (['zugang' => 'access', 'termin' => 'event', 'sitzungen' => 'sessions', 'kohorte' => 'cohort'] as $alt => $neu) {
+            $this->assertSame($neu, Product::firstWhere('handle', 'alt-'.$alt)->type);
+        }
+
+        // And every value the model knows is one this addon's siblings would
+        // recognise as their own spelling: lowercase ASCII, no German.
+        foreach (Product::types() as $type) {
+            $this->assertMatchesRegularExpression('/^[a-z][a-z_]*$/', $type);
+        }
+    }
+
+    #[Test]
     public function a_product_written_before_kinds_existed_is_a_download(): void
     {
         // The column's default, and the only reason it has one. Rows exist that
@@ -178,7 +213,7 @@ class ProductTypeTest extends TestCase
         $collection = tap(CollectionFacade::make('kurse'))->save();
         $entry = tap(EntryFacade::make()->collection($collection)->slug('atemkurs')->data(['title' => 'Atem und Stütze']))->save();
 
-        $product = $this->produkt(['type' => Product::TYPE_ZUGANG, 'ref' => $entry->id()]);
+        $product = $this->produkt(['type' => Product::TYPE_ACCESS, 'ref' => $entry->id()]);
 
         $target = $product->refTarget();
         $this->assertSame(RefTarget::RESOLVED, $target->state);
@@ -192,7 +227,7 @@ class ProductTypeTest extends TestCase
         // **The failure this whole field exists to surface.** Sold, paid,
         // access granted, and the identifier corresponds to nothing. Nothing
         // errors; the screen is the only thing that can say it.
-        $product = $this->produkt(['type' => Product::TYPE_ZUGANG, 'ref' => 'gibt-es-nicht']);
+        $product = $this->produkt(['type' => Product::TYPE_ACCESS, 'ref' => 'gibt-es-nicht']);
 
         $this->assertTrue($product->refTarget()->isMissing());
     }
@@ -217,7 +252,7 @@ class ProductTypeTest extends TestCase
         $this->assertTrue(class_exists(Event::class));
         $this->assertFalse(Schema::hasTable('events'));
 
-        $target = $this->produkt(['type' => Product::TYPE_TERMIN, 'ref' => 'irgendwas'])->refTarget();
+        $target = $this->produkt(['type' => Product::TYPE_EVENT, 'ref' => 'irgendwas'])->refTarget();
 
         $this->assertSame(RefTarget::UNKNOWABLE, $target->state);
         $this->assertFalse($target->isMissing(), 'accused a pointer nobody can check');
@@ -233,7 +268,7 @@ class ProductTypeTest extends TestCase
         // Panel.
         $event = $this->event('Werkstatt-Tag');
 
-        $target = $this->produkt(['type' => Product::TYPE_TERMIN, 'ref' => $event->uuid])->refTarget();
+        $target = $this->produkt(['type' => Product::TYPE_EVENT, 'ref' => $event->uuid])->refTarget();
 
         $this->assertSame(RefTarget::RESOLVED, $target->state);
         $this->assertSame('Werkstatt-Tag', $target->label);
@@ -244,7 +279,7 @@ class ProductTypeTest extends TestCase
     {
         $this->event('Irgendein Termin');
 
-        $target = $this->produkt(['type' => Product::TYPE_TERMIN, 'ref' => 'gibt-es-nicht'])->refTarget();
+        $target = $this->produkt(['type' => Product::TYPE_EVENT, 'ref' => 'gibt-es-nicht'])->refTarget();
 
         $this->assertTrue($target->isMissing());
     }
@@ -259,7 +294,7 @@ class ProductTypeTest extends TestCase
         $this->assertTrue(class_exists(Booking::class));
         $this->assertSame([], (array) config('statamic-booking.endpoints', []));
 
-        $target = $this->produkt(['type' => Product::TYPE_SITZUNGEN, 'ref' => 'beratung'])->refTarget();
+        $target = $this->produkt(['type' => Product::TYPE_SESSIONS, 'ref' => 'beratung'])->refTarget();
 
         $this->assertSame(RefTarget::UNKNOWABLE, $target->state);
     }
@@ -271,7 +306,7 @@ class ProductTypeTest extends TestCase
             'beratung' => ['secret' => 'geheim', 'label' => 'Kostenloses Erstgespräch'],
         ]]);
 
-        $target = $this->produkt(['type' => Product::TYPE_SITZUNGEN, 'ref' => 'beratung'])->refTarget();
+        $target = $this->produkt(['type' => Product::TYPE_SESSIONS, 'ref' => 'beratung'])->refTarget();
 
         $this->assertSame(RefTarget::RESOLVED, $target->state);
         $this->assertSame('Kostenloses Erstgespräch', $target->label);
@@ -284,7 +319,7 @@ class ProductTypeTest extends TestCase
             'beratung' => ['secret' => 'geheim'],
         ]]);
 
-        $target = $this->produkt(['type' => Product::TYPE_SITZUNGEN, 'ref' => 'abgeschafft'])->refTarget();
+        $target = $this->produkt(['type' => Product::TYPE_SESSIONS, 'ref' => 'abgeschafft'])->refTarget();
 
         $this->assertTrue($target->isMissing());
     }
@@ -295,7 +330,7 @@ class ProductTypeTest extends TestCase
         // A kind added to the model but not to `RefTarget`. The row is not
         // wrong; the resolver is behind. Accusing the row would send somebody
         // looking for a defect that is not there.
-        $product = $this->produkt(['type' => Product::TYPE_ZUGANG, 'ref' => 'egal']);
+        $product = $this->produkt(['type' => Product::TYPE_ACCESS, 'ref' => 'egal']);
         DB::table('products')->where('handle', 'atemkurs')->update(['type' => 'kuenftige-art']);
 
         $this->assertSame(RefTarget::UNKNOWABLE, $product->fresh()->refTarget()->state);
@@ -312,7 +347,7 @@ class ProductTypeTest extends TestCase
         //
         // And the row comes back **unknowable**, not missing: a lookup that
         // threw has not established that the target is gone.
-        $this->produkt(['handle' => 'kaputt', 'name' => 'Kaputt', 'type' => Product::TYPE_ZUGANG, 'ref' => 'egal']);
+        $this->produkt(['handle' => 'kaputt', 'name' => 'Kaputt', 'type' => Product::TYPE_ACCESS, 'ref' => 'egal']);
         $this->produkt(['handle' => 'datei', 'name' => 'Datei']);
 
         EntryFacade::swap(new class
@@ -353,7 +388,7 @@ class ProductTypeTest extends TestCase
             $this->produkt([
                 'handle' => 'termin-'.$i,
                 'name' => 'Termin '.$i,
-                'type' => Product::TYPE_TERMIN,
+                'type' => Product::TYPE_EVENT,
                 // Five point at the same date, one at nothing: the memo must
                 // not paper over a batch that never ran, and a miss has to stay
                 // a miss.
@@ -385,8 +420,8 @@ class ProductTypeTest extends TestCase
         // because somebody hid a column is the silent failure this field exists
         // against, so the number lives above the table where no preference
         // reaches it.
-        $this->produkt(['handle' => 'weg-1', 'name' => 'Weg 1', 'type' => Product::TYPE_ZUGANG, 'ref' => 'gibt-es-nicht']);
-        $this->produkt(['handle' => 'weg-2', 'name' => 'Weg 2', 'type' => Product::TYPE_KOHORTE, 'ref' => 'auch-nicht']);
+        $this->produkt(['handle' => 'weg-1', 'name' => 'Weg 1', 'type' => Product::TYPE_ACCESS, 'ref' => 'gibt-es-nicht']);
+        $this->produkt(['handle' => 'weg-2', 'name' => 'Weg 2', 'type' => Product::TYPE_COHORT, 'ref' => 'auch-nicht']);
         $this->produkt(['handle' => 'heil', 'name' => 'Heil']);
 
         $this->actingAs($this->user())
@@ -410,7 +445,7 @@ class ProductTypeTest extends TestCase
                 ->data(['title' => 'Atem und Stütze'])
         )->save();
 
-        $product = $this->produkt(['type' => Product::TYPE_ZUGANG, 'ref' => $entry->id()]);
+        $product = $this->produkt(['type' => Product::TYPE_ACCESS, 'ref' => $entry->id()]);
 
         $entry = app(Catalogue::class)->find('atemkurs');
 
@@ -427,7 +462,7 @@ class ProductTypeTest extends TestCase
     {
         // Changing your mind is a normal edit and must not require clearing the
         // field by hand first.
-        $product = $this->produkt(['type' => Product::TYPE_ZUGANG, 'ref' => 'irgendeine-id']);
+        $product = $this->produkt(['type' => Product::TYPE_ACCESS, 'ref' => 'irgendeine-id']);
 
         $this->actingAs($this->user())
             ->patchJson('/cp/utilities/products/'.$product->id, $this->valid([
@@ -442,8 +477,8 @@ class ProductTypeTest extends TestCase
     #[Test]
     public function the_listing_flags_a_missing_target_and_leaves_an_uncheckable_one_alone(): void
     {
-        $this->produkt(['handle' => 'weg', 'name' => 'Weg', 'type' => Product::TYPE_ZUGANG, 'ref' => 'gibt-es-nicht']);
-        $this->produkt(['handle' => 'ungewiss', 'name' => 'Ungewiss', 'type' => Product::TYPE_TERMIN, 'ref' => 'irgendwas']);
+        $this->produkt(['handle' => 'weg', 'name' => 'Weg', 'type' => Product::TYPE_ACCESS, 'ref' => 'gibt-es-nicht']);
+        $this->produkt(['handle' => 'ungewiss', 'name' => 'Ungewiss', 'type' => Product::TYPE_EVENT, 'ref' => 'irgendwas']);
         $this->produkt(['handle' => 'datei', 'name' => 'Datei', 'type' => Product::TYPE_DOWNLOAD]);
 
         $rows = collect(

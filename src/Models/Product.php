@@ -44,16 +44,16 @@ class Product extends Model
     public const TYPE_DOWNLOAD = 'download';
 
     /** A course, a members area, a community. Points at a Statamic entry. */
-    public const TYPE_ZUGANG = 'zugang';
+    public const TYPE_ACCESS = 'access';
 
     /** A live date: workshop, concert, webinar. Points at a `statamic-events` uuid. */
-    public const TYPE_TERMIN = 'termin';
+    public const TYPE_EVENT = 'event';
 
     /** A package of sessions. Points at a `statamic-booking` funnel handle. */
-    public const TYPE_SITZUNGEN = 'sitzungen';
+    public const TYPE_SESSIONS = 'sessions';
 
     /** A programme with a start, an end and a group. Points at a Statamic entry. */
-    public const TYPE_KOHORTE = 'kohorte';
+    public const TYPE_COHORT = 'cohort';
 
     /** A paid podcast or newsletter. Points at a Statamic collection handle. */
     public const TYPE_FEED = 'feed';
@@ -64,7 +64,7 @@ class Product extends Model
      * The kinds a product may be.
      *
      * **Each one is an answer, never an instruction.** Naming a product a
-     * `termin` says it is a live date; nothing in this addon reserves a seat
+     * `event` says it is a live date; nothing in this addon reserves a seat
      * because of it. Delivery lives on the website and in sibling addons — some
      * of which are not built yet — and the day one of them wants to act on a
      * kind, it reads this field and does so itself.
@@ -75,10 +75,10 @@ class Product extends Model
     {
         return [
             self::TYPE_DOWNLOAD,
-            self::TYPE_ZUGANG,
-            self::TYPE_TERMIN,
-            self::TYPE_SITZUNGEN,
-            self::TYPE_KOHORTE,
+            self::TYPE_ACCESS,
+            self::TYPE_EVENT,
+            self::TYPE_SESSIONS,
+            self::TYPE_COHORT,
             self::TYPE_FEED,
         ];
     }

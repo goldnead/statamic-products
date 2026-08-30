@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.1.0 — 2026-08-30
+
+### Behoben: die Arten hießen auf Deutsch, gespeichert wird in dieser Familie Englisch
+
+`statamic-payments` speichert `paid`, `open`, `expired`. `statamic-offers` speichert `bump`,
+`post_purchase`, `standalone`. `statamic-booking` speichert `booked`, `cancelled`. Dieses Addon
+hatte in 1.0.0 `zugang`, `termin`, `sitzungen` und `kohorte` — deutsche Werte in einer englischen
+Codebasis, in einer Spalte, die ein Käufer in seiner eigenen Datenbank liest.
+
+Neu: `access`, `event`, `sessions`, `cohort`. `download` und `feed` waren schon englisch.
+
+Eine Migration schreibt vorhandene Zeilen um; sie ist umkehrbar, weil ein Rollback, der Werte
+zurücklässt, die der alte Code nicht kennt, kein Rollback ist. Aufgefallen ist es beim Audit des
+Statamic Addon Studio, wenige Stunden nach 1.0.0 und bevor jemand installiert hatte — ein
+gespeicherter Wert ist ab der ersten Installation festgeschrieben.
+
+**Wer 1.0.0 schon installiert hat, braucht nur `php artisan migrate`.**
+
 ## 1.0.0 — 2026-08-30
 
 Erste Fassung. Braucht `goldnead/statamic-payments` **1.15** — dort sitzt
