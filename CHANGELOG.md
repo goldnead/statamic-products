@@ -1,9 +1,10 @@
 # Changelog
 
-## Unveröffentlicht
+## 1.0.0 — 2026-08-30
 
-Erste Fassung. Noch nicht getaggt: sie braucht `goldnead/statamic-payments` 1.15 mit
-`Catalogue::contribute()`, und das ist selbst noch unveröffentlicht.
+Erste Fassung. Braucht `goldnead/statamic-payments` **1.15** — dort sitzt
+`Catalogue::contribute()`, ohne das ein Produkt zwar kaufbar wäre, aber in keiner Auswahl
+auftauchte.
 
 ### Neu: ein Produkt ist endlich ein Ding
 
