@@ -97,9 +97,16 @@ class ProductsController extends CpController
      * the data is installed and migrated — `null` here is "cannot know", an
      * empty list is "nobody", and the screen shows them differently.
      */
-    public function show(Product $product)
+    public function show(int $product)
     {
         $this->authorizeAccess();
+
+        // Scoped, not implicitly bound: `{product}` is an id anyone can type,
+        // and in multi-brand mode another brand's product is not this brand's
+        // to see — least of all its buyers' e-mail addresses. Same rule as
+        // the listing, a 404 rather than a 403 so that the id gives nothing
+        // away.
+        $product = Product::query()->forBrand()->findOrFail($product);
 
         return Inertia::render('statamic-products::Products/Show', [
             'product' => [

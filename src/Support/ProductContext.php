@@ -2,6 +2,7 @@
 
 namespace Goldnead\StatamicProducts\Support;
 
+use Goldnead\StatamicPayments\Support\Brands;
 use Goldnead\StatamicProducts\Models\Product;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -95,6 +96,11 @@ final class ProductContext
             ->join('payments', 'payments.id', '=', 'payment_items.payment_id')
             ->where('payment_items.product', $product->handle)
             ->where('payments.status', 'paid')
+            // A handle is unique across brands, so the payments of one handle
+            // are one brand's — but only as long as nobody re-stamps a row.
+            // Narrowed to the product's own brand anyway: a buyer list is the
+            // one place where a wrong row is a stranger's e-mail address.
+            ->when(Brands::multiBrand(), fn ($query) => $query->where('payments.brand_id', (int) $product->brand_id))
             ->orderByDesc('payments.paid_at')
             ->orderByDesc('payments.id')
             ->limit(self::BUYERS_LIMIT)

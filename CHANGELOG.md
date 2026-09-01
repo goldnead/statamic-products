@@ -20,6 +20,10 @@ die Fakten des Produkts und darunter zwei Abschnitte:
   als Order-Bump oder Nachkauf: E-Mail, Datum, Betrag der Zeile, Erstattet-Abzeichen, Sprung
   in die Zahlungsliste.
 
+Die Seite ist markenverengt wie die Liste: im Multi-Brand-Betrieb ist ein Produkt einer anderen
+Marke ein 404, und die Käuferliste ist zusätzlich auf `payments.brand_id` des Produkts
+eingeschränkt. Ohne aktuelle Marke gibt es keine Seite (fail-closed, wie überall in der Familie).
+
 Beide Abschnitte gibt es nur, wenn das jeweilige Addon installiert und migriert ist
 (`Support\Siblings`, Klassen- plus Tabellenprüfung). Fehlt es, fehlt der Abschnitt — `null`
 ist „kann ich nicht wissen", eine leere Liste ist „niemand", und der Bildschirm zeigt nur

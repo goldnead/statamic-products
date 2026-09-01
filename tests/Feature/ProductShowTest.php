@@ -50,6 +50,36 @@ class ProductShowTest extends TestCase
         return tap(User::make()->email('studio@example.com')->makeSuper())->save();
     }
 
+    /**
+     * A stand-in for brand-context's manager, answering exactly what `Brands`
+     * asks — the same one `BrandScopeTest` uses.
+     */
+    protected function marke(bool $multi = true, ?int $current = 1): void
+    {
+        $this->app->instance('brand-context', new class($multi, $current)
+        {
+            public function __construct(
+                protected bool $multi,
+                protected ?int $current,
+            ) {}
+
+            public function multiBrandEnabled(): bool
+            {
+                return $this->multi;
+            }
+
+            public function hasCurrent(): bool
+            {
+                return $this->current !== null;
+            }
+
+            public function currentId(): ?int
+            {
+                return $this->current;
+            }
+        });
+    }
+
     protected function product(array $overrides = []): Product
     {
         return Product::create(array_merge([
@@ -231,6 +261,53 @@ class ProductShowTest extends TestCase
             ->get('/cp/utilities/products/'.$product->id)
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('buyers', null));
+    }
+
+    /**
+     * Another brand's product is not this brand's to see.
+     *
+     * A 404 and not a 403: the id is guessable, and "forbidden" would confirm
+     * that something is there. Same answer the listing gives.
+     */
+    #[Test]
+    public function another_brands_product_is_not_found_in_multi_brand_mode(): void
+    {
+        $this->marke(current: 1);
+        $fremd = $this->product(['brand_id' => 2]);
+        $eigen = $this->product(['handle' => 'eigen', 'brand_id' => 1]);
+
+        $user = $this->user();
+
+        $this->actingAs($user)->getJson('/cp/utilities/products/'.$fremd->id)->assertNotFound();
+        $this->actingAs($user)->get('/cp/utilities/products/'.$eigen->id)->assertOk();
+    }
+
+    /** With no brand current, the screen fails closed like the listing does. */
+    #[Test]
+    public function no_current_brand_means_no_product_screen(): void
+    {
+        $this->marke(current: null);
+        $product = $this->product(['brand_id' => 1]);
+
+        $this->actingAs($this->user())->getJson('/cp/utilities/products/'.$product->id)->assertNotFound();
+    }
+
+    /** The buyer list is narrowed to the product's brand, even for a re-stamped row. */
+    #[Test]
+    public function buyers_of_another_brand_are_not_listed_in_multi_brand_mode(): void
+    {
+        $this->marke(current: 1);
+        $product = $this->product(['brand_id' => 1]);
+
+        $this->purchase('atemkurs', ['email' => 'eigen@example.com', 'brand_id' => 1]);
+        $this->purchase('atemkurs', ['email' => 'fremd@example.com', 'brand_id' => 2]);
+
+        $this->actingAs($this->user())
+            ->get('/cp/utilities/products/'.$product->id)
+            ->assertInertia(fn ($page) => $page
+                ->has('buyers', 1)
+                ->where('buyers.0.email', 'eigen@example.com')
+            );
     }
 
     #[Test]
