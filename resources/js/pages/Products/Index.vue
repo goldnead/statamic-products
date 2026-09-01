@@ -274,6 +274,8 @@ function confirmRemove() {
 
             <template #prepended-row-actions="{ row }">
                 <DropdownItem icon="edit" :text="t.edit_action" @click="edit(row)" />
+                <!-- The way back from a product: who sells it, who bought it. -->
+                <DropdownItem icon="eye" :text="t.show_action" :href="row.show_url" />
                 <DropdownItem icon="trash" variant="destructive" :text="t.delete_action" @click="deleting = row" />
             </template>
         </Listing>
@@ -296,8 +298,16 @@ function confirmRemove() {
                  is themeable at runtime, and a hard-coded surface drifts the
                  moment somebody re-themes their Control Panel. -->
             <div class="flex h-full flex-col bg-content-bg">
-                <div class="border-b border-content-border px-6 py-4">
+                <div class="flex items-center justify-between gap-3 border-b border-content-border px-6 py-4">
                     <Heading :text="title" size="lg" />
+                    <!-- Only an existing product has offers and buyers to show. -->
+                    <Button
+                        v-if="editing?.show_url"
+                        :href="editing.show_url"
+                        :text="t.show_action"
+                        icon="eye"
+                        size="sm"
+                    />
                 </div>
 
                 <div class="flex-1 space-y-5 overflow-y-auto px-6 py-5">

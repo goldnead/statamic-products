@@ -5,6 +5,8 @@ namespace Goldnead\StatamicProducts\Http\Controllers\Cp;
 use Goldnead\StatamicPayments\Support\Catalogue;
 use Goldnead\StatamicProducts\Http\Resources\Cp\ProductsCollection;
 use Goldnead\StatamicProducts\Models\Product;
+use Goldnead\StatamicProducts\Support\CpNumber;
+use Goldnead\StatamicProducts\Support\ProductContext;
 use Goldnead\StatamicProducts\Support\RefTarget;
 use Goldnead\StatamicProducts\Support\SoldHandles;
 use Illuminate\Database\Eloquent\Builder;
@@ -82,6 +84,40 @@ class ProductsController extends CpController
             'danglingBanner' => $dangling > 0
                 ? trans_choice('statamic-products::messages.dangling_banner', $dangling, ['count' => $dangling])
                 : null,
+            't' => $this->strings(),
+        ]);
+    }
+
+    /**
+     * One product, and what the rest of the family knows about it.
+     *
+     * The row itself is edited in the stack on the listing; this screen is the
+     * way *back* from a product: the offers that sell it and the people who
+     * bought it. Either section is present only when the sibling that owns
+     * the data is installed and migrated — `null` here is "cannot know", an
+     * empty list is "nobody", and the screen shows them differently.
+     */
+    public function show(Product $product)
+    {
+        $this->authorizeAccess();
+
+        return Inertia::render('statamic-products::Products/Show', [
+            'product' => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'handle' => $product->handle,
+                'type_label' => __('statamic-products::messages.type_'.$product->type),
+                'amount' => CpNumber::decimal($product->amount_cent / 100, 2),
+                'currency' => $product->currency(),
+                'digital' => (bool) $product->digital,
+                'grants' => $product->grantSlugs(),
+                'active' => (bool) $product->active,
+                'sold' => $product->hasBeenSold(),
+            ],
+            'offers' => ProductContext::offers($product),
+            'buyers' => ProductContext::buyers($product),
+            'buyersLimit' => ProductContext::BUYERS_LIMIT,
+            'indexUrl' => cp_route('utilities.products'),
             't' => $this->strings(),
         ]);
     }
@@ -377,6 +413,31 @@ class ProductsController extends CpController
             'cancel' => __('Cancel'),
             'edit_action' => __('Edit'),
             'delete_action' => __('Delete'),
+            'show_action' => __('statamic-products::messages.show_action'),
+            'back_to_list' => __('statamic-products::messages.back_to_list'),
+            'facts_heading' => __('statamic-products::messages.facts_heading'),
+            'section_offers' => __('statamic-products::messages.section_offers'),
+            'section_offers_hint' => __('statamic-products::messages.section_offers_hint'),
+            'offers_empty' => __('statamic-products::messages.offers_empty'),
+            'section_buyers' => __('statamic-products::messages.section_buyers'),
+            'section_buyers_hint' => __('statamic-products::messages.section_buyers_hint'),
+            'buyers_empty' => __('statamic-products::messages.buyers_empty'),
+            'col_offer' => __('statamic-products::messages.col_offer'),
+            'col_slot' => __('statamic-products::messages.col_slot'),
+            'col_price' => __('statamic-products::messages.col_price'),
+            'col_active' => __('statamic-products::messages.column_active'),
+            'col_buyer' => __('statamic-products::messages.col_buyer'),
+            'col_paid_at' => __('statamic-products::messages.col_paid_at'),
+            'col_amount' => __('statamic-products::messages.col_amount'),
+            'list_price_badge' => __('statamic-products::messages.list_price_badge'),
+            'bundle_badge' => __('statamic-products::messages.bundle_badge'),
+            'refunded_badge' => __('statamic-products::messages.refunded_badge'),
+            'kind_bump' => __('statamic-products::messages.kind_bump'),
+            'kind_upsell' => __('statamic-products::messages.kind_upsell'),
+            'open_offer' => __('statamic-products::messages.open_offer'),
+            'open_payment' => __('statamic-products::messages.open_payment'),
+            'no_email' => __('statamic-products::messages.no_email'),
+            'grants_none' => __('statamic-products::messages.grants_none'),
         ];
     }
 }

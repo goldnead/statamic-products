@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+### Neu: das Produkt zeigt seine Angebote und seine Käufer
+
+Bisher kannte die Familie nur die Hinrichtung: ein Angebot zeigt auf ein Produkt, eine
+Zahlungszeile trägt seine Kennung. Vom Produkt aus gab es keinen Weg zurück, und „wer hat
+das gekauft" hieß: zwei andere Bildschirme öffnen und suchen.
+
+Jetzt hat jedes Produkt eine eigene Seite (`GET utilities/products/{product}`, aus der Liste
+über „Angebote und Käufer" in den Zeilenaktionen und aus dem Bearbeiten-Stapel). Sie zeigt
+die Fakten des Produkts und darunter zwei Abschnitte:
+
+- **Angebote** — jedes Angebot, das dieses Produkt verkauft, als Hauptprodukt (`product`)
+  oder im Bündel (`products`), mit Platz, Preis (Listenpreis, wenn das Angebot keinen
+  eigenen hat), Aktiv und einem Sprung in die Angebotsliste, dort schon auf die Kennung
+  gefiltert.
+- **Käufer** — die letzten 50 bezahlten Käufe über `payment_items` ⋈ `payments`, also auch
+  als Order-Bump oder Nachkauf: E-Mail, Datum, Betrag der Zeile, Erstattet-Abzeichen, Sprung
+  in die Zahlungsliste.
+
+Beide Abschnitte gibt es nur, wenn das jeweilige Addon installiert und migriert ist
+(`Support\Siblings`, Klassen- plus Tabellenprüfung). Fehlt es, fehlt der Abschnitt — `null`
+ist „kann ich nicht wissen", eine leere Liste ist „niemand", und der Bildschirm zeigt nur
+Letzteres als Leerzustand.
+
+Die Sprünge in die Nachbarlisten sind Suchen (`?search=`), keine Detailseiten: weder Angebote
+noch Zahlungen haben eine. Ist die Nachbar-Utility nicht registriert, gibt es keinen Knopf.
+
 ## 1.2.0 — 2026-08-30
 
 ### Behoben: ein abgebrochener Kauf fror die Kennung für immer ein

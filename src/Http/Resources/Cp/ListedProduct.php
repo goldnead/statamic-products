@@ -22,6 +22,9 @@ class ListedProduct extends JsonResource
             'id' => $this->id,
             'handle' => $this->handle,
             'name' => $this->name,
+            // The way from the row to what the rest of the family knows about
+            // it: the offers that sell it and the people who bought it.
+            'show_url' => cp_route('utilities.products.show', $this->id),
             // Formatted here rather than by the model, so this listing writes a
             // price the way the offers listing next door does. The model's
             // `amount()` is a machine-readable decimal and stays that way.

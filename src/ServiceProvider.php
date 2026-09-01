@@ -153,6 +153,7 @@ class ServiceProvider extends AddonServiceProvider
                 ->docsUrl('https://github.com/goldnead/statamic-products#readme')
                 ->routes(function ($router) {
                     $router->post('/', [ProductsController::class, 'store'])->name('store');
+                    $router->get('{product}', [ProductsController::class, 'show'])->name('show');
                     $router->patch('{product}', [ProductsController::class, 'update'])->name('update');
                     $router->delete('{product}', [ProductsController::class, 'destroy'])->name('destroy');
                 });

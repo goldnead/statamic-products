@@ -20,6 +20,13 @@ php artisan migrate
 
 Products then live under **Utilities → Products**.
 
+Each product also has a screen of its own — **Offers and buyers** in a row's actions — that
+shows the way back from the product: every offer that sells it, as lead product or in a
+bundle, and the last fifty people who paid for it, including as an order bump or a
+follow-up. The offers section is there only with `statamic-offers` installed; the buyers
+section only once the payments tables exist. A missing sibling means no section, not an
+empty one.
+
 ## Usage
 
 Create products under **Utilities → Products**. From there they behave like any other entry in the
