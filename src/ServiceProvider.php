@@ -2,12 +2,12 @@
 
 namespace Goldnead\StatamicProducts;
 
+use Goldnead\StatamicPayments\Cp\SuiteNav;
 use Goldnead\StatamicPayments\Support\Brands;
 use Goldnead\StatamicPayments\Support\Catalogue;
 use Goldnead\StatamicProducts\Http\Controllers\Cp\ProductsController;
 use Goldnead\StatamicProducts\Models\Product;
 use Illuminate\Support\Facades\Log;
-use Goldnead\StatamicPayments\Cp\SuiteNav;
 use Statamic\Facades\CP\Nav;
 use Statamic\Facades\Utility;
 use Statamic\Providers\AddonServiceProvider;

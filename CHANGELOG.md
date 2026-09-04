@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.4.0 — 2026-09-05
+
+### Neu: Produkte im Verkaufs-Abschnitt der Seitenleiste
+
+Der Produkt-Bildschirm ist als Statamic-Utility registriert und stand deshalb unter „Hilfsmittel",
+zwischen Cache und PHP-Info (Adrian, 03.09.2026, F36). Jetzt hängt er im Verkaufs-Abschnitt, den
+`statamic-payments` mit `Cp\SuiteNav::section()` benennt: derselbe Abschnitt wie Zahlungen,
+Angebote und Funnels, damit nicht zwei fast gleich benannte Abschnitte nebeneinander stehen,
+denn Statamic übersetzt Abschnittsnamen nicht.
+
+Route und Recht bleiben. Der Eintrag unter „Hilfsmittel" wird ausgehängt, sonst stünde der
+Bildschirm zweimal da; so war es im ersten Anlauf vom 04.09.
+
+**Setzt `goldnead/statamic-payments` ab 1.18.0 voraus**, dort erst gibt es `Cp\SuiteNav`.
+
 ## 1.3.0 — 2026-09-02
 
 ### Neu: das Produkt zeigt seine Angebote und seine Käufer
