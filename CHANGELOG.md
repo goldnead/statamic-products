@@ -13,7 +13,14 @@ denn Statamic übersetzt Abschnittsnamen nicht.
 Route und Recht bleiben. Der Eintrag unter „Hilfsmittel" wird ausgehängt, sonst stünde der
 Bildschirm zweimal da; so war es im ersten Anlauf vom 04.09.
 
-**Setzt `goldnead/statamic-payments` ab 1.18.0 voraus**, dort erst gibt es `Cp\SuiteNav`.
+`Cp\SuiteNav` gibt es erst seit `goldnead/statamic-payments` 1.18.0, der Constraint erlaubt
+weiterhin `^1.15`. Deshalb steht der Aufruf hinter `class_exists()`, wie in `statamic-booking`:
+mit älterem payments bekommt der Bildschirm einen eigenen Abschnitt „Produkte" statt eines
+`Class not found` beim Aufbau der ganzen CP-Navigation. Den gemeinsamen Verkaufs-Abschnitt gibt
+es ab payments 1.18.0.
+
+Intern: `tests/Fakes/insights-table-metric.php` auf insights 1.2.1 nachgezogen (`bucketed()`
+sortiert die Eimer explizit).
 
 ## 1.3.0 — 2026-09-02
 
