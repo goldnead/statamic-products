@@ -35,7 +35,8 @@
   "extra": {
     "statamic": {
       "name": "Statamic Products",
-      "description": "The thing that is sold: a name, a list price, and the access it grants."
+      "description": "The thing that is sold: a name, a list price, and the access it grants.",
+      "developer-url": "https://adriangoldner.dev"
     },
     "laravel": {
       "providers": [
