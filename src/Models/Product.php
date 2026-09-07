@@ -28,6 +28,13 @@ use Throwable;
  * @property string $type
  * @property string|null $ref
  * @property int $amount_cent
+ * @property string|null $interval — der Rhythmus im Wortlaut des Anbieters
+ *                                 (`1 month`, `12 weeks`). Leer heisst: einmalig, kein Plan.
+ * @property int|null $times — Anzahl der Abbuchungen. `null` ist ein Abo,
+ *                           eine Zahl eine Ratenzahlung.
+ * @property int|null $trial_days
+ * @property int|null $trial_amount_cent — `null` heisst „der gewoehnliche
+ *                                       Betrag", `0` heisst kostenlos.
  * @property string|null $currency
  * @property bool $digital
  * @property array<array-key, mixed>|null $grants — a JSON column, so it holds
@@ -99,6 +106,9 @@ class Product extends Model
     {
         return [
             'amount_cent' => 'integer',
+            'times' => 'integer',
+            'trial_days' => 'integer',
+            'trial_amount_cent' => 'integer',
             'digital' => 'boolean',
             'grants' => 'array',
             'active' => 'boolean',
@@ -167,6 +177,36 @@ class Product extends Model
 
         if ($grants !== []) {
             $entry['grants'] = $grants;
+        }
+
+        // Der Zahlungsrhythmus, und nur wenn es einen gibt.
+        //
+        // `Subscriptions::planFor()` steigt aus, sobald `interval` leer ist —
+        // ein Produkt ohne Rhythmus verhaelt sich damit wie vorher, und der
+        // Schluessel taucht gar nicht erst auf. Das ist dieselbe Regel wie bei
+        // `grants` darueber: weglassen statt leer schicken.
+        //
+        // **Ohne diese Zeilen kann ein Produkt aus der Tabelle keinen Plan
+        // tragen.** Genau das war zwischen dem Katalog-Umzug und dem
+        // 07.09.2026 der Fall: `statamic-payments` kann Abo, Ratenzahlung und
+        // Testphase seit 1.5.0, aber es liest sie aus dem Katalog, und der gab
+        // sie nicht weiter. Kein Fehler, kein Log — die Faehigkeit war
+        // schlicht nicht erreichbar.
+        $interval = is_string($this->interval) ? trim($this->interval) : '';
+
+        if ($interval !== '') {
+            $entry['interval'] = $interval;
+
+            // `null` heisst „ohne Ende" und ist damit ein Abo; eine Zahl macht
+            // daraus eine Ratenzahlung. Beides wird nur mitgegeben, wenn es
+            // gesetzt ist — `planFor()` liest ein fehlendes `times` selbst als
+            // `null`, und ein ausgeschriebenes `null` waere dieselbe Aussage
+            // mit mehr Zeichen.
+            foreach (['times', 'trial_days', 'trial_amount_cent'] as $feld) {
+                if ($this->{$feld} !== null) {
+                    $entry[$feld] = (int) $this->{$feld};
+                }
+            }
         }
 
         return $entry;

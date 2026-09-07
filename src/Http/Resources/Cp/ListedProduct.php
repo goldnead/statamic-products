@@ -67,6 +67,16 @@ class ListedProduct extends JsonResource
                 'ref' => $this->ref,
                 'amount_cent' => $this->amount_cent,
                 'currency' => $this->currency,
+
+                // Der Zahlungsrhythmus. `null` heisst einmalig — das Formular
+                // zeigt dann leere Felder, und das ist die richtige Anzeige
+                // fuer „kein Plan". Ohne diese vier Zeilen liesse sich ein
+                // bestehender Plan im Control Panel nicht sehen und beim
+                // naechsten Speichern still ueberschreiben.
+                'interval' => $this->interval,
+                'times' => $this->times,
+                'trial_days' => $this->trial_days,
+                'trial_amount_cent' => $this->trial_amount_cent,
                 // As a string, because the Control Panel's `Select` does not
                 // accept a boolean `modelValue` — see the note beside
                 // `supplyOptions` in the screen. Laravel's `boolean` rule reads

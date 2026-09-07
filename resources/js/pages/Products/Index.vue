@@ -48,6 +48,8 @@ const blank = () => ({
     // chose.
     type: null, ref: '',
     amount_cent: null, currency: null,
+    // Leer heisst einmalig. Siehe das Feld weiter unten.
+    interval: null, times: null, trial_days: null, trial_amount_cent: null,
     digital: null,
     grants: [],
     active: true,
@@ -353,6 +355,65 @@ function confirmRemove() {
 
                         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                             {{ t.field_amount_help }} {{ t.field_currency_help }}
+                        </p>
+                    </div>
+
+                    <!-- Der Zahlungsrhythmus. Vier Felder, eine Entscheidung,
+                         deshalb stehen sie zusammen und der Hilfstext steht
+                         einmal darunter statt viermal daneben.
+
+                         Leer ist der Normalfall: einmalig zahlen. Wer hier
+                         etwas eintraegt, sagt damit, dass abgebucht wird —
+                         ohne Anzahl endlos, mit Anzahl so oft. Die Felder
+                         darunter sind ohne Rhythmus wirkungslos und werden
+                         beim Speichern mit geleert. -->
+                    <div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <Field :label="t.field_interval" :error="errors.interval">
+                                <Input
+                                    v-model="form.interval"
+                                    class="font-mono"
+                                    :placeholder="t.field_interval_placeholder"
+                                />
+                            </Field>
+
+                            <Field :label="t.field_times" :error="errors.times">
+                                <Input
+                                    :model-value="form.times"
+                                    type="number"
+                                    min="1"
+                                    :placeholder="t.field_times_placeholder"
+                                    :disabled="!form.interval"
+                                    @update:model-value="form.times = $event === '' ? null : Number($event)"
+                                />
+                            </Field>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mt-4">
+                            <Field :label="t.field_trial_days" :error="errors.trial_days">
+                                <Input
+                                    :model-value="form.trial_days"
+                                    type="number"
+                                    min="0"
+                                    :disabled="!form.interval"
+                                    @update:model-value="form.trial_days = $event === '' ? null : Number($event)"
+                                />
+                            </Field>
+
+                            <Field :label="t.field_trial_amount" :error="errors.trial_amount_cent">
+                                <Input
+                                    :model-value="form.trial_amount_cent"
+                                    type="number"
+                                    min="0"
+                                    :append="form.currency || currency"
+                                    :disabled="!form.interval"
+                                    @update:model-value="form.trial_amount_cent = $event === '' ? null : Number($event)"
+                                />
+                            </Field>
+                        </div>
+
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            {{ t.field_plan_help }}
                         </p>
                     </div>
 

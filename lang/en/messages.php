@@ -33,6 +33,14 @@ return [
 
     'field_amount' => 'List price',
     'field_amount_help' => 'In cents. 0 means free.',
+    'field_plan' => 'Payment rhythm',
+    'field_plan_help' => 'Empty means a one-off payment. With a rhythm it recurs — without a count forever (subscription), with one that many times (instalments).',
+    'field_interval' => 'Interval',
+    'field_interval_placeholder' => 'e.g. 1 month',
+    'field_times' => 'Count',
+    'field_times_placeholder' => 'empty = subscription',
+    'field_trial_days' => 'Trial days',
+    'field_trial_amount' => 'Trial price',
     'field_currency' => 'Currency',
     'field_currency_help' => 'Leave empty for the shop currency.',
 

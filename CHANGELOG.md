@@ -1,5 +1,53 @@
 # Changelog
 
+## 1.5.0 — 2026-09-07
+
+### Neu: ein Produkt kann einen Zahlungsrhythmus tragen
+
+Vier Spalten auf `products`: `interval`, `times`, `trial_days`, `trial_amount_cent`. Alle
+nullable, und `interval` ist der Schalter — ohne ihn verhält sich ein Produkt exakt wie
+vorher.
+
+**Das ist keine neue Fähigkeit, sondern eine wiederhergestellte.** `statamic-payments` kann
+Abo, Ratenzahlung und Testphase seit 1.5.0 — ein Mechanismus, drei Gesichter: `times = null`
+ist ein Abo, `times = N` eine Ratenzahlung, `trial_days` eine Testphase
+(`Subscriptions::planFor()`). Gelesen wird der Plan aus dem Katalog.
+
+Solange der Katalog eine Config war, stand er dort und funktionierte. Seit dieses Addon die
+Produkte in eine Tabelle geholt hat, gab `Product::toCatalogueEntry()` genau `handle`, `name`,
+`amount_cent`, `currency`, `digital` und `grants` weiter — und damit **konnte eine Zeile aus
+der Datenbank keinen Plan mehr tragen**. `planFor()` gab für jedes Tabellen-Produkt `null`
+zurück, ohne Fehler und ohne Log. Die Fähigkeit war nicht kaputt, sie war unerreichbar.
+
+Aufgefallen am 06.09.2026 an einer konkreten Stelle: die ChoirAccelerator-Seite von
+adriangoldner.com verspricht „2 × 780 EUR oder 3 × 520 EUR", und beim Umzug des Kaufs auf den
+eigenen Funnel stellte sich heraus, dass die eigene Kasse das nicht anbieten kann.
+
+### Control Panel
+
+Vier Felder im Produkt-Formular, zusammen als eine Entscheidung. Anzahl, Testtage und
+Testbetrag sind ohne Rhythmus deaktiviert und werden beim Speichern mit geleert — sonst bleibt
+an einem einmalig verkauften Produkt ein `times = 3` hängen, das niemand sieht und das wirkt,
+sobald jemand später ein Intervall setzt.
+
+Null Abbuchungen werden abgewiesen: das ist ein Tippfehler, keine Anweisung.
+
+### Warum keine Aufzählung für `interval`
+
+Freitext im Wortlaut des Anbieters (`1 month`, `12 weeks`).
+`Subscriptions::afterOneInterval()` reicht den Wert an Carbon weiter und fällt bei Unlesbarem
+auf einen Monat zurück, statt zu werfen. Eine engere Regel hier beschnitte, was das
+Zahlungs-Addon kann.
+
+### Tests
+
+`PaymentPlanTest` (5) und drei im `ProductScreenTest`. Der wichtigste ist der erste: ein
+Produkt **ohne** Rhythmus bekommt weiterhin keinen. Eine Migration mit Standardwerten hätte
+aus jedem bestehenden Produkt ein Abo gemacht.
+
+`down()` prüft auf die Tabelle, bevor es Spalten wirft — `CatalogueTest` löscht sie
+absichtlich, um zu belegen, dass eine fehlende Tabelle die Kasse nicht mitreißt.
+
 ## 1.4.0 — 2026-09-05
 
 ### Neu: Produkte im Verkaufs-Abschnitt der Seitenleiste

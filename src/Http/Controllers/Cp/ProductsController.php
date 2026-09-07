@@ -116,6 +116,15 @@ class ProductsController extends CpController
                 'type_label' => __('statamic-products::messages.type_'.$product->type),
                 'amount' => CpNumber::decimal($product->amount_cent / 100, 2),
                 'currency' => $product->currency(),
+
+                // Der Zahlungsrhythmus, so wie er in der Spalte steht. `null`
+                // heisst einmalig — das Formular zeigt dann ein leeres Feld,
+                // und genau das ist die richtige Anzeige fuer „kein Plan".
+                'interval' => $product->interval,
+                'times' => $product->times,
+                'trial_days' => $product->trial_days,
+                'trial_amount_cent' => $product->trial_amount_cent,
+
                 'digital' => (bool) $product->digital,
                 'grants' => $product->grantSlugs(),
                 'active' => (bool) $product->active,
@@ -208,6 +217,29 @@ class ProductsController extends CpController
             // read as 49 cents.
             'amount_cent' => ['required', 'integer', 'min:0'],
             'currency' => ['nullable', 'string', 'size:3'],
+
+            // Der Zahlungsrhythmus. Leer heisst einmalig — der Normalfall,
+            // und deshalb `nullable` statt eines Standardwerts: ein Default
+            // machte aus jedem Produkt ein Abo.
+            //
+            // Freitext im Wortlaut des Anbieters (`1 month`, `12 weeks`),
+            // keine Aufzaehlung. `Subscriptions::afterOneInterval()` reicht
+            // ihn an Carbon weiter und faellt bei Unlesbarem auf einen Monat
+            // zurueck; eine engere Regel hier beschnitte, was das
+            // Zahlungs-Addon kann.
+            'interval' => ['nullable', 'string', 'max:32'],
+
+            // Ohne Anzahl ist es ein Abo, mit Anzahl eine Ratenzahlung.
+            // `min:1`, weil null Abbuchungen ein Tippfehler sind und keine
+            // Anweisung — `planFor()` faengt das ohnehin ab, aber ein
+            // Formular soll es sagen, statt es stillschweigend zu schlucken.
+            'times' => ['nullable', 'integer', 'min:1', 'max:60'],
+
+            'trial_days' => ['nullable', 'integer', 'min:0', 'max:365'],
+
+            // `0` ist erlaubt und heisst kostenlos; leer heisst „der
+            // gewoehnliche Betrag".
+            'trial_amount_cent' => ['nullable', 'integer', 'min:0'],
             // **Required with no default, and that is the point of the field.**
             // It decides the place of supply and with it the mandatory tax
             // notice (§ 3a UStG). Any default is wrong for half a catalogue,
@@ -232,6 +264,25 @@ class ProductsController extends CpController
         }
 
         $data['ref'] = ($data['ref'] ?? null) === '' ? null : ($data['ref'] ?? null);
+
+        // Der Rhythmus ist der Schalter fuer die drei Felder daneben.
+        //
+        // Leer heisst leer: ein Formular schickt ein ungefuelltes Feld als
+        // leeren String, und `planFor()` liest den zwar auch als „kein Plan",
+        // aber dann staende in der Spalte etwas, das keiner gemeint hat.
+        //
+        // Und ohne Rhythmus werden Anzahl, Testtage und Testbetrag mit
+        // geleert. Sonst bleibt an einem einmalig verkauften Produkt ein
+        // `times = 3` haengen, das niemand sieht und das beim naechsten
+        // Setzen eines Intervalls ploetzlich wirkt.
+        $intervall = trim((string) ($data['interval'] ?? ''));
+        $data['interval'] = $intervall === '' ? null : $intervall;
+
+        if ($data['interval'] === null) {
+            $data['times'] = null;
+            $data['trial_days'] = null;
+            $data['trial_amount_cent'] = null;
+        }
 
         // **Only what was actually sent.** `$request->boolean()` answers false
         // for a key that is absent, so a PATCH that simply left `active` out
@@ -396,6 +447,14 @@ class ProductsController extends CpController
             'handle_frozen' => __('statamic-products::messages.handle_frozen'),
             'field_amount' => __('statamic-products::messages.field_amount'),
             'field_amount_help' => __('statamic-products::messages.field_amount_help'),
+            'field_plan' => __('statamic-products::messages.field_plan'),
+            'field_plan_help' => __('statamic-products::messages.field_plan_help'),
+            'field_interval' => __('statamic-products::messages.field_interval'),
+            'field_interval_placeholder' => __('statamic-products::messages.field_interval_placeholder'),
+            'field_times' => __('statamic-products::messages.field_times'),
+            'field_times_placeholder' => __('statamic-products::messages.field_times_placeholder'),
+            'field_trial_days' => __('statamic-products::messages.field_trial_days'),
+            'field_trial_amount' => __('statamic-products::messages.field_trial_amount'),
             'field_currency' => __('statamic-products::messages.field_currency'),
             'field_currency_help' => __('statamic-products::messages.field_currency_help'),
             'field_digital' => __('statamic-products::messages.field_digital'),

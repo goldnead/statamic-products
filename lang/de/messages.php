@@ -33,6 +33,14 @@ return [
 
     'field_amount' => 'Listenpreis',
     'field_amount_help' => 'In Cent. 0 heißt kostenlos.',
+    'field_plan' => 'Zahlungsrhythmus',
+    'field_plan_help' => 'Leer heißt: einmalig zahlen. Mit Rhythmus wird abgebucht — ohne Anzahl endlos (Abo), mit Anzahl so oft (Ratenzahlung).',
+    'field_interval' => 'Rhythmus',
+    'field_interval_placeholder' => 'z. B. 1 month',
+    'field_times' => 'Anzahl',
+    'field_times_placeholder' => 'leer = Abo',
+    'field_trial_days' => 'Testtage',
+    'field_trial_amount' => 'Preis der Testphase',
     'field_currency' => 'Währung',
     'field_currency_help' => 'Leer lassen: die des Shops.',
 

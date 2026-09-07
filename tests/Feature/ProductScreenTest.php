@@ -444,4 +444,65 @@ class ProductScreenTest extends TestCase
         $this->assertTrue($sold['produkt-3']);
         $this->assertFalse($sold['produkt-1']);
     }
+
+    /**
+     * Der Zahlungsrhythmus laesst sich im Control Panel setzen.
+     *
+     * Bis zum 07.09.2026 konnte ein Produkt aus der Tabelle keinen Plan
+     * tragen — `statamic-payments` kann Abo und Ratenzahlung seit 1.5.0, aber
+     * der Katalog gab sie nicht weiter. Ohne diese Felder im Formular waere
+     * die Faehigkeit zwar da, aber nur per Tinker erreichbar, und das ist
+     * keine.
+     */
+    #[Test]
+    public function a_payment_plan_can_be_set_in_the_control_panel(): void
+    {
+        $this->actingAs($this->user())
+            ->postJson('/cp/utilities/products', $this->valid([
+                'interval' => '1 month',
+                'times' => 3,
+            ]))
+            ->assertRedirect();
+
+        $product = Product::firstWhere('handle', 'atemkurs');
+
+        $this->assertSame('1 month', $product->interval);
+        $this->assertSame(3, $product->times);
+    }
+
+    /**
+     * Ohne Rhythmus wird der Rest mit geleert.
+     *
+     * Sonst bleibt an einem einmalig verkauften Produkt ein `times` haengen,
+     * das niemand sieht — und das wirkt, sobald jemand spaeter ein Intervall
+     * setzt.
+     */
+    #[Test]
+    public function clearing_the_interval_clears_the_rest_of_the_plan(): void
+    {
+        $product = $this->product(['interval' => '1 month', 'times' => 3, 'trial_days' => 14]);
+
+        $this->actingAs($this->user())
+            ->patchJson('/cp/utilities/products/'.$product->id, $this->valid([
+                'handle' => 'bestand',
+                'name' => 'Bestand',
+                'interval' => '',
+            ]))
+            ->assertRedirect();
+
+        $product->refresh();
+
+        $this->assertNull($product->interval, 'Ein leeres Feld darf keinen leeren String hinterlassen.');
+        $this->assertNull($product->times);
+        $this->assertNull($product->trial_days);
+    }
+
+    /** Null Abbuchungen sind ein Tippfehler, keine Anweisung. */
+    #[Test]
+    public function a_count_of_zero_is_refused(): void
+    {
+        $this->actingAs($this->user())
+            ->postJson('/cp/utilities/products', $this->valid(['interval' => '1 month', 'times' => 0]))
+            ->assertJsonValidationErrors('times');
+    }
 }
