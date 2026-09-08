@@ -8,6 +8,7 @@ use Goldnead\StatamicProducts\Models\Product;
 use Goldnead\StatamicProducts\Support\CpNumber;
 use Goldnead\StatamicProducts\Support\ProductContext;
 use Goldnead\StatamicProducts\Support\RefTarget;
+use Goldnead\StatamicProducts\Support\Setup;
 use Goldnead\StatamicProducts\Support\SoldHandles;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -35,6 +36,16 @@ class ProductsController extends CpController
     public function index(FilteredRequest $request)
     {
         $this->authorizeAccess();
+
+        // Before the branch, so the listing's own XHR is guarded too — it hits
+        // the same table and would answer 500 behind a page that rendered fine.
+        // The payment tables are deliberately not in this list: `SoldHandles`
+        // already treats an unreadable payment table as "everything is sold",
+        // logs it and keeps the screen, and a catalogue is worth reading on a
+        // site that has not migrated payments yet.
+        if ($setup = Setup::guard(__('statamic-products::messages.utility_nav'), 'products')) {
+            return $setup;
+        }
 
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return $this->json($request);

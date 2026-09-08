@@ -4,6 +4,8 @@ return [
     'utility_title' => 'Produkte',
     'utility_nav' => 'Produkte',
     'utility_description' => 'Was es zu kaufen gibt, was es kostet und was es freischaltet.',
+    'setup_required_heading' => 'Diese Seite braucht ihre Datenbanktabellen, und die gibt es noch nicht.',
+    'setup_required_description' => 'Führe `php artisan migrate` aus, danach lädt die Seite normal. Der Grund steht auch im Log.',
 
     'empty_heading' => 'Noch keine Produkte',
     'empty_title' => 'Hier ist noch nichts',
