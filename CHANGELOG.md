@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.6.0 — 2026-09-08
+
+### Changed: the products screen shows an empty state instead of HTTP 500 when its table is missing
+
+The screen hangs off `Utility::register()`, so its nav entry appears the moment composer put the
+package there — migrations are a separate, manual step. Between the two, `/cp/utilities/products`
+answered HTTP 500, because the listing reaches for `products` while the page is being built. It now
+checks before the first query and renders a setup page that names the missing table and says to run
+`php artisan migrate`.
+
+The reason does not disappear with the 500: the guarded page writes to the log why it turned
+somebody away. Otherwise the site would look installed and never work.
+
 ## 1.5.0 — 2026-09-07
 
 ### New: a product can carry a payment plan
