@@ -2,230 +2,222 @@
 
 ## 1.5.0 — 2026-09-07
 
-### Neu: ein Produkt kann einen Zahlungsrhythmus tragen
+### New: a product can carry a payment plan
 
-Vier Spalten auf `products`: `interval`, `times`, `trial_days`, `trial_amount_cent`. Alle
-nullable, und `interval` ist der Schalter — ohne ihn verhält sich ein Produkt exakt wie
-vorher.
+Four columns on `products`: `interval`, `times`, `trial_days`, `trial_amount_cent`. All
+nullable, and `interval` is the switch — without it a product behaves exactly as before.
 
-**Das ist keine neue Fähigkeit, sondern eine wiederhergestellte.** `statamic-payments` kann
-Abo, Ratenzahlung und Testphase seit 1.5.0 — ein Mechanismus, drei Gesichter: `times = null`
-ist ein Abo, `times = N` eine Ratenzahlung, `trial_days` eine Testphase
-(`Subscriptions::planFor()`). Gelesen wird der Plan aus dem Katalog.
+**This is not a new capability but a restored one.** `statamic-payments` has been able to do
+subscriptions, instalments and trials since 1.5.0 — one mechanism, three faces: `times = null`
+is a subscription, `times = N` an instalment plan, `trial_days` a trial
+(`Subscriptions::planFor()`). The plan is read from the catalogue.
 
-Solange der Katalog eine Config war, stand er dort und funktionierte. Seit dieses Addon die
-Produkte in eine Tabelle geholt hat, gab `Product::toCatalogueEntry()` genau `handle`, `name`,
-`amount_cent`, `currency`, `digital` und `grants` weiter — und damit **konnte eine Zeile aus
-der Datenbank keinen Plan mehr tragen**. `planFor()` gab für jedes Tabellen-Produkt `null`
-zurück, ohne Fehler und ohne Log. Die Fähigkeit war nicht kaputt, sie war unerreichbar.
+As long as the catalogue was a config, the plan sat there and worked. Since this addon moved
+the products into a table, `Product::toCatalogueEntry()` passed on exactly `handle`, `name`,
+`amount_cent`, `currency`, `digital` and `grants` — and so **a row from the database could no
+longer carry a plan**. `planFor()` returned `null` for every table product, without an error and
+without a log entry. The capability was not broken, it was unreachable.
 
-Aufgefallen am 06.09.2026 an einer konkreten Stelle: die ChoirAccelerator-Seite von
-adriangoldner.com verspricht „2 × 780 EUR oder 3 × 520 EUR", und beim Umzug des Kaufs auf den
-eigenen Funnel stellte sich heraus, dass die eigene Kasse das nicht anbieten kann.
+Noticed on 2026-09-06 in a concrete place: the ChoirAccelerator page on adriangoldner.com
+promises "2 × 780 EUR or 3 × 520 EUR", and while moving the purchase onto our own funnel it
+turned out that our own checkout cannot offer that.
 
 ### Control Panel
 
-Vier Felder im Produkt-Formular, zusammen als eine Entscheidung. Anzahl, Testtage und
-Testbetrag sind ohne Rhythmus deaktiviert und werden beim Speichern mit geleert — sonst bleibt
-an einem einmalig verkauften Produkt ein `times = 3` hängen, das niemand sieht und das wirkt,
-sobald jemand später ein Intervall setzt.
+Four fields in the product form, together as one decision. Count, trial days and trial amount
+are disabled without an interval and are cleared along with it on save — otherwise a `times = 3`
+stays hanging on a product sold once, which nobody sees and which takes effect as soon as
+somebody later sets an interval.
 
-Null Abbuchungen werden abgewiesen: das ist ein Tippfehler, keine Anweisung.
+Zero charges are rejected: that is a typo, not an instruction.
 
-### Warum keine Aufzählung für `interval`
+### Why no enumeration for `interval`
 
-Freitext im Wortlaut des Anbieters (`1 month`, `12 weeks`).
-`Subscriptions::afterOneInterval()` reicht den Wert an Carbon weiter und fällt bei Unlesbarem
-auf einen Monat zurück, statt zu werfen. Eine engere Regel hier beschnitte, was das
-Zahlungs-Addon kann.
+Free text in the provider's own wording (`1 month`, `12 weeks`).
+`Subscriptions::afterOneInterval()` passes the value on to Carbon and falls back to one month on
+anything unreadable instead of throwing. A stricter rule here would cut down what the payment
+addon can do.
 
 ### Tests
 
-`PaymentPlanTest` (5) und drei im `ProductScreenTest`. Der wichtigste ist der erste: ein
-Produkt **ohne** Rhythmus bekommt weiterhin keinen. Eine Migration mit Standardwerten hätte
-aus jedem bestehenden Produkt ein Abo gemacht.
+`PaymentPlanTest` (5) and three in `ProductScreenTest`. The most important is the first: a
+product **without** a plan still gets none. A migration with default values would have turned
+every existing product into a subscription.
 
-`down()` prüft auf die Tabelle, bevor es Spalten wirft — `CatalogueTest` löscht sie
-absichtlich, um zu belegen, dass eine fehlende Tabelle die Kasse nicht mitreißt.
+`down()` checks for the table before it drops columns — `CatalogueTest` deletes it deliberately,
+to show that a missing table does not take the checkout down with it.
 
 ## 1.4.0 — 2026-09-05
 
-### Neu: Produkte im Verkaufs-Abschnitt der Seitenleiste
+### New: products in the sales section of the sidebar
 
-Der Produkt-Bildschirm ist als Statamic-Utility registriert und stand deshalb unter „Hilfsmittel",
-zwischen Cache und PHP-Info (Adrian, 03.09.2026, F36). Jetzt hängt er im Verkaufs-Abschnitt, den
-`statamic-payments` mit `Cp\SuiteNav::section()` benennt: derselbe Abschnitt wie Zahlungen,
-Angebote und Funnels, damit nicht zwei fast gleich benannte Abschnitte nebeneinander stehen,
-denn Statamic übersetzt Abschnittsnamen nicht.
+The product screen is registered as a Statamic utility and therefore sat under "Utilities",
+between Cache and PHP Info (Adrian, 2026-09-03, F36). It now hangs in the sales section that
+`statamic-payments` names with `Cp\SuiteNav::section()`: the same section as Payments, Offers
+and Funnels, so that two almost identically named sections do not stand side by side, because
+Statamic does not translate section names.
 
-Route und Recht bleiben. Der Eintrag unter „Hilfsmittel" wird ausgehängt, sonst stünde der
-Bildschirm zweimal da; so war es im ersten Anlauf vom 04.09.
+Route and permission stay. The entry under "Utilities" is unhooked, otherwise the screen would
+stand there twice; that is how it was in the first attempt on 09-04.
 
-`Cp\SuiteNav` gibt es erst seit `goldnead/statamic-payments` 1.18.0, der Constraint erlaubt
-weiterhin `^1.15`. Deshalb steht der Aufruf hinter `class_exists()`, wie in `statamic-booking`:
-mit älterem payments bekommt der Bildschirm einen eigenen Abschnitt „Produkte" statt eines
-`Class not found` beim Aufbau der ganzen CP-Navigation. Den gemeinsamen Verkaufs-Abschnitt gibt
-es ab payments 1.18.0.
+`Cp\SuiteNav` only exists from `goldnead/statamic-payments` 1.18.0 on, and the constraint still
+allows `^1.15`. The call therefore sits behind `class_exists()`, as in `statamic-booking`: with
+an older payments the screen gets a section "Products" of its own instead of a `Class not found`
+while the whole CP navigation is being built. The shared sales section exists from payments
+1.18.0 on.
 
-Intern: `tests/Fakes/insights-table-metric.php` auf insights 1.2.1 nachgezogen (`bucketed()`
-sortiert die Eimer explizit).
+Internal: `tests/Fakes/insights-table-metric.php` brought up to insights 1.2.1 (`bucketed()`
+sorts the buckets explicitly).
 
 ## 1.3.0 — 2026-09-02
 
-### Neu: das Produkt zeigt seine Angebote und seine Käufer
+### New: the product shows its offers and its buyers
 
-Bisher kannte die Familie nur die Hinrichtung: ein Angebot zeigt auf ein Produkt, eine
-Zahlungszeile trägt seine Kennung. Vom Produkt aus gab es keinen Weg zurück, und „wer hat
-das gekauft" hieß: zwei andere Bildschirme öffnen und suchen.
+Until now the family only knew the forward direction: an offer points at a product, a payment row
+carries its handle. From the product there was no way back, and "who bought this" meant opening
+two other screens and searching.
 
-Jetzt hat jedes Produkt eine eigene Seite (`GET utilities/products/{product}`, aus der Liste
-über „Angebote und Käufer" in den Zeilenaktionen und aus dem Bearbeiten-Stapel). Sie zeigt
-die Fakten des Produkts und darunter zwei Abschnitte:
+Now every product has a page of its own (`GET utilities/products/{product}`, reached from the
+listing through "Offers and buyers" in the row actions and from the edit stack). It shows the
+product's facts and below them two sections:
 
-- **Angebote** — jedes Angebot, das dieses Produkt verkauft, als Hauptprodukt (`product`)
-  oder im Bündel (`products`), mit Platz, Preis (Listenpreis, wenn das Angebot keinen
-  eigenen hat), Aktiv und einem Sprung in die Angebotsliste, dort schon auf die Kennung
-  gefiltert.
-- **Käufer** — die letzten 50 bezahlten Käufe über `payment_items` ⋈ `payments`, also auch
-  als Order-Bump oder Nachkauf: E-Mail, Datum, Betrag der Zeile, Erstattet-Abzeichen, Sprung
-  in die Zahlungsliste.
+- **Offers** — every offer that sells this product, as the main product (`product`) or in a
+  bundle (`products`), with slot, price (the list price when the offer has none of its own),
+  active, and a jump into the offer listing, already filtered on the handle.
+- **Buyers** — the last 50 paid purchases through `payment_items` ⋈ `payments`, so including
+  those bought as an order bump or after the purchase: email, date, the row's amount, refunded
+  badge, jump into the payment listing.
 
-Die Seite ist markenverengt wie die Liste: im Multi-Brand-Betrieb ist ein Produkt einer anderen
-Marke ein 404, und die Käuferliste ist zusätzlich auf `payments.brand_id` des Produkts
-eingeschränkt. Ohne aktuelle Marke gibt es keine Seite (fail-closed, wie überall in der Familie).
+The page is brand-scoped like the listing: in multi-brand operation a product of another brand is
+a 404, and the buyer list is additionally restricted to the product's `payments.brand_id`. With
+no current brand there is no page (fail-closed, as everywhere in the family).
 
-Beide Abschnitte gibt es nur, wenn das jeweilige Addon installiert und migriert ist
-(`Support\Siblings`, Klassen- plus Tabellenprüfung). Fehlt es, fehlt der Abschnitt — `null`
-ist „kann ich nicht wissen", eine leere Liste ist „niemand", und der Bildschirm zeigt nur
-Letzteres als Leerzustand.
+Both sections exist only when the addon in question is installed and migrated
+(`Support\Siblings`, a class check plus a table check). If it is missing, the section is
+missing — `null` is "I cannot know", an empty list is "nobody", and the screen shows only the
+latter as an empty state.
 
-Die Sprünge in die Nachbarlisten sind Suchen (`?search=`), keine Detailseiten: weder Angebote
-noch Zahlungen haben eine. Ist die Nachbar-Utility nicht registriert, gibt es keinen Knopf.
+The jumps into the neighbouring listings are searches (`?search=`), not detail pages: neither
+offers nor payments have one. If the neighbouring utility is not registered, there is no button.
 
 ## 1.2.0 — 2026-08-30
 
-### Behoben: ein abgebrochener Kauf fror die Kennung für immer ein
+### Fixed: an abandoned purchase froze the handle forever
 
-`hasBeenSold()` fragte, ob **irgendeine** Zahlungszeile die Kennung trägt. `Checkout::start()`
-schreibt aber die `payments`-Zeile und ihre `payment_items` **bevor** es den Anbieter aufruft, mit
-Status `initiated` — und `prune_unpaid_after_days` steht ab Werk auf `0`, also räumt sie niemand
-weg.
+`hasBeenSold()` asked whether **any** payment row carried the handle. But `Checkout::start()`
+writes the `payments` row and its `payment_items` **before** it calls the provider, with status
+`initiated` — and `prune_unpaid_after_days` is `0` out of the box, so nobody clears them away.
 
-Folge: Ein Besucher öffnet den Bezahlvorgang und schließt den Tab. Danach ist die Kennung des
-Produkts gesperrt und Löschen wird verweigert, dauerhaft, für ein Produkt, das nie jemand gekauft
-hat. Der Grund war nirgends sichtbar — die Meldung sagt „wurde schon verkauft".
+Consequence: a visitor opens the checkout and closes the tab. After that the product's handle is
+locked and deletion is refused, permanently, for a product nobody ever bought. The reason was
+visible nowhere — the message says "has already been sold".
 
-Jetzt zählt nur noch `status = paid`. Eine Erstattung hebt die Sperre nicht auf: Erstattungen sind
-Spalten auf einer bezahlten Zeile, der Status bleibt `paid`, und die Rechnung existiert weiter.
+Now only `status = paid` counts. A refund does not lift the lock: refunds are columns on a paid
+row, the status stays `paid`, and the invoice still exists.
 
-### Behoben: ein PATCH ohne `active` oder `grants` löschte beide, still, mit 200
+### Fixed: a PATCH without `active` or `grants` deleted both, silently, with 200
 
-`$request->boolean()` liest einen fehlenden Schlüssel als `false`, und `(array) null` ist `[]`. Wer
-per PATCH nur den Preis änderte, schaltete damit das Produkt ab und warf seine Zugänge weg — und
-bekam `200` zurück. Das eigene Formular schickt immer alle Felder, deshalb ist es dort nie
-aufgefallen.
+`$request->boolean()` reads a missing key as `false`, and `(array) null` is `[]`. Anyone who
+changed only the price by PATCH switched the product off and threw its grants away — and got
+`200` back. Our own form always sends every field, which is why it never showed up there.
 
-Jetzt wird nur geschrieben, was tatsächlich gesendet wurde. `grants: []` bleibt eine Aussage und
-leert weiterhin.
+Now only what was actually sent is written. `grants: []` remains a statement and still empties.
 
-**Beide Fehler waren an einer grünen Testsuite vorbeigekommen**, weil jedes Fixture mit `paid`
-zahlte und kein Test ein Teil-PATCH schickte. Fünf Tests dazu, gegengeprüft: gegen den alten Stand
-werden sie rot.
+**Both bugs had got past a green test suite**, because every fixture paid with `paid` and no test
+sent a partial PATCH. Five tests for it, counter-checked: against the old state they turn red.
 
-Gefunden beim Schreiben der Dokumentation — von einem Agenten, der die Prosa gegen den Code prüfte.
+Found while writing the documentation — by an agent that checked the prose against the code.
 
 ## 1.1.0 — 2026-08-30
 
-### Behoben: die Arten hießen auf Deutsch, gespeichert wird in dieser Familie Englisch
+### Fixed: the types were named in German, while this family stores English
 
-`statamic-payments` speichert `paid`, `open`, `expired`. `statamic-offers` speichert `bump`,
-`post_purchase`, `standalone`. `statamic-booking` speichert `booked`, `cancelled`. Dieses Addon
-hatte in 1.0.0 `zugang`, `termin`, `sitzungen` und `kohorte` — deutsche Werte in einer englischen
-Codebasis, in einer Spalte, die ein Käufer in seiner eigenen Datenbank liest.
+`statamic-payments` stores `paid`, `open`, `expired`. `statamic-offers` stores `bump`,
+`post_purchase`, `standalone`. `statamic-booking` stores `booked`, `cancelled`. In 1.0.0 this
+addon had `zugang`, `termin`, `sitzungen` and `kohorte` — German values in an English code base,
+in a column a buyer reads in his own database.
 
-Neu: `access`, `event`, `sessions`, `cohort`. `download` und `feed` waren schon englisch.
+New: `access`, `event`, `sessions`, `cohort`. `download` and `feed` were English already.
 
-Eine Migration schreibt vorhandene Zeilen um; sie ist umkehrbar, weil ein Rollback, der Werte
-zurücklässt, die der alte Code nicht kennt, kein Rollback ist. Aufgefallen ist es beim Audit des
-Statamic Addon Studio, wenige Stunden nach 1.0.0 und bevor jemand installiert hatte — ein
-gespeicherter Wert ist ab der ersten Installation festgeschrieben.
+A migration rewrites existing rows; it is reversible, because a rollback that leaves behind
+values the old code does not know is not a rollback. It was noticed during the Statamic Addon
+Studio audit, a few hours after 1.0.0 and before anybody had installed it — a stored value is
+fixed from the first installation on.
 
-**Wer 1.0.0 schon installiert hat, braucht nur `php artisan migrate`.**
+**Anyone who has already installed 1.0.0 only needs `php artisan migrate`.**
 
 ## 1.0.0 — 2026-08-30
 
-Erste Fassung. Braucht `goldnead/statamic-payments` **1.15** — dort sitzt
-`Catalogue::contribute()`, ohne das ein Produkt zwar kaufbar wäre, aber in keiner Auswahl
-auftauchte.
+First version. Requires `goldnead/statamic-payments` **1.15** — that is where
+`Catalogue::contribute()` sits, without which a product would be purchasable but would appear in
+no selection.
 
-### Neu: ein Produkt ist endlich ein Ding
+### New: a product is finally a thing
 
-Ein Produkt lag bisher auf drei Stellen verteilt, und keine wusste, was es ist: `statamic-offers`
-wusste, wie man eines präsentiert, `statamic-payments` wusste, was eines kostet — eine Zeile in
-einer Config-Datei, ohne Bildschirm —, und `statamic-entitlements` wusste, dass jemand Zugang dazu
-hat, als freie Zeichenkette. Das Ding selbst gab es nirgends, also erfand es jede Website neu. Auf
-adriangoldner.com wurde es zweimal erfunden, als `member_packages` und als `access_packages`, und
-die beiden liefen auseinander.
+Until now a product lay spread over three places, and none of them knew what it is:
+`statamic-offers` knew how to present one, `statamic-payments` knew what one costs — a line in a
+config file, without a screen — and `statamic-entitlements` knew that somebody has access to it,
+as a free string. The thing itself existed nowhere, so every website invented it anew. On
+adriangoldner.com it was invented twice, as `member_packages` and as `access_packages`, and the
+two drifted apart.
 
-Eine Tabelle, ein Bildschirm unter **Hilfsmittel → Produkte**, und zwei Anschlüsse an den Katalog
-des Zahlungs-Addons. Mehr nicht: **das Addon liefert nichts aus.** Was ein Kurs *anzeigt*, bleibt
-Sache der Website. Es sagt, dass ein Kurs existiert, was er kostet und was er öffnet.
+One table, one screen under **Utilities → Products**, and two connections to the payment addon's
+catalogue. No more than that: **the addon delivers nothing.** What a course *shows* stays the
+website's business. It says that a course exists, what it costs and what it opens.
 
-### Neu: eine Art und ein Zeiger
+### New: a type and a pointer
 
-`type` und `ref`. Sechs Arten: Download, Zugang, Termin, Sitzungen, Kohorte, Feed.
+`type` and `ref`. Six types: download, access, event, sessions, cohort, feed.
 
-**Die Art ist eine Auskunft, kein Automat.** Ein Produkt „Termin" zu nennen sagt, dass es ein
-Live-Datum ist; es reserviert keinen Platz. Bei Kajabi und Podia ist die Produktart die
-Auslieferung selbst — die Kursart *ist* der Player —, und dieser Weg endet darin, Kursplayer,
-Community-Engine, Terminverwaltung und Podcast-Hosting selbst zu bauen. Ausgeliefert wird auf der
-Website und in den Nachbar-Addons. Manche davon gibt es noch nicht.
+**The type is a statement, not an automation.** Calling a product "event" says that it is a live
+date; it reserves no seat. With Kajabi and Podia the product type is the delivery itself — the
+course type *is* the player — and that road ends in building the course player, community
+engine, calendar management and podcast hosting yourself. Delivery happens on the website and in
+the neighbouring addons. Some of those do not exist yet.
 
-Deshalb hat ein Zeiger **drei** Zustände, nicht zwei: gefunden, weg, und *niemand hier kann es
-sagen*. Die beiden letzten zu verwechseln heißt entweder, ein einwandfreies Produkt anzuklagen,
-oder einen kaputten Zeiger durchzuwinken, weil das Paket fehlt, das ihn bemerkt hätte. Ein
-Termin-Produkt lässt sich anlegen, bevor `statamic-events` installiert ist.
+That is why a pointer has **three** states, not two: found, gone, and *nobody here can say*.
+Confusing the last two means either accusing a faultless product, or waving a broken pointer
+through because the package that would have noticed it is missing. An event product can be
+created before `statamic-events` is installed.
 
-**Was ins Leere zeigt, wird gezählt, nicht nur markiert.** Das Abzeichen an der Zeile sagt, welches
-Produkt betroffen ist; die Zahl über der Tabelle sagt, dass überhaupt welche betroffen sind. Jede
-Spalte im Control Panel lässt sich abwählen, und ein Katalog, der sauber aussieht, weil jemand eine
-Spalte ausgeblendet hat, ist genau der stille Fehler, gegen den das Feld gebaut ist.
+**What points at nothing is counted, not only marked.** The badge on the row says which product
+is affected; the number above the table says that any are affected at all. Every column in the
+Control Panel can be switched off, and a catalogue that looks clean because somebody hid a column
+is exactly the silent error the field is built against.
 
-`statamic-events` und `statamic-booking` sind optional und liegen als `require-dev` bei — damit die
-Auflösung gegen deren echte Migration und deren echtes Modell getestet wird und nicht gegen eine
-Tabelle, die dieses Addon sich selbst ausgedacht hat.
+`statamic-events` and `statamic-booking` are optional and ship as `require-dev` — so that
+resolution is tested against their real migration and their real model, and not against a table
+this addon made up for itself.
 
-### Die Entscheidungen, die drinstecken
+### The decisions inside it
 
-**Die Kennung ist über alle Marken eindeutig, auch wenn die Zeile es nicht ist.** Sie steht auf
-Zahlungszeilen und Rechnungen, die in Jahren noch lesbar sein müssen, und keine dieser Stellen
-kennt eine Marke — ein Anbieter-Webhook am wenigsten. Eine Agentur mit drei Marken benennt ihre
-Produkte deshalb auseinander. Das kostet etwas, und es kostet weniger als ein Webhook, der nicht
-bepreisen kann, was er geschickt bekam.
+**The handle is unique across all brands, even when the row is not.** It stands on payment rows
+and invoices that must still be readable in years, and none of those places knows a brand — a
+provider webhook least of all. An agency with three brands therefore names its products apart.
+That costs something, and it costs less than a webhook that cannot price what it was sent.
 
-**Die Kennung eines verkauften Produkts ist festgeschrieben.** Umbenennen bricht nichts laut — es
-sorgt dafür, dass eine alte Rechnung eine Zeile zeigt, deren Produkt niemand mehr findet. Alles
-andere daran bleibt änderbar; ein Preis, der sich nach dem ersten Verkauf nie mehr korrigieren
-ließe, wäre die schlechtere Regel.
+**The handle of a sold product is fixed.** Renaming breaks nothing loudly — it makes an old
+invoice show a row whose product nobody can find any more. Everything else about it stays
+changeable; a price that could never be corrected after the first sale would be the worse rule.
 
-**Ein verkauftes Produkt wird nicht gelöscht, sondern stillgelegt.** Der Löschknopf sagt nein,
-statt still etwas anderes zu tun.
+**A sold product is not deleted but retired.** The delete button says no instead of silently
+doing something else.
 
-**`digital` hat keine Vorauswahl.** Es ist keine Beschreibung des Mediums, sondern die Angabe, die
-über den Leistungsort und damit über den Pflichthinweis auf der Rechnung entscheidet (§ 3a UStG).
-Jede Vorbelegung ist für die Hälfte eines Katalogs falsch, und eine falsche Vorbelegung zeigt sich
-als Steuerzeile, die niemand geprüft hat.
+**`digital` has no preselection.** It is not a description of the medium but the statement that
+decides the place of supply and thereby the mandatory note on the invoice (§ 3a UStG). Any
+default is wrong for half of a catalogue, and a wrong default shows up as a tax line nobody
+checked.
 
-**Config schlägt Tabelle.** Ein Preis in einer Datei steht in der Versionsverwaltung und wurde
-absichtlich hingeschrieben. Die Kollision wird trotzdem gezeigt — Abzeichen in der Liste, Warnung
-im Formular —, weil zwei Wahrheiten über einen Preis genau die Krankheit sind, an der eine Kasse
-330 abbuchte, während der Katalog 332 sagte.
+**Config beats table.** A price in a file is in version control and was written down
+deliberately. The collision is shown anyway — badge in the listing, warning in the form —
+because two truths about one price are exactly the illness that had a checkout charging 330 while
+the catalogue said 332.
 
-**Preise auflösen braucht keine Marke, Produkte auflisten schon.** `extend()` wird von allem
-erreicht, was ein Browser schickt, und von einem Webhook Stunden nach dem Kauf; `contribute()` nur
-von einem Bildschirm. Der eine antwortet ungefiltert, der andere fällt zu.
+**Resolving prices needs no brand, listing products does.** `extend()` is reached by everything a
+browser sends, and by a webhook hours after the purchase; `contribute()` only by a screen. The
+one answers unfiltered, the other falls closed.
 
-**Eine fehlende Tabelle nimmt die Kasse nicht mit.** Zwischen `composer require` und
-`php artisan migrate` liegen auf einem echten Host Minuten und auf einer vergessenen Staging-Box
-Monate. In diesem Fenster antwortet der Katalog, als wäre das Addon nicht installiert — und
-schreibt es ins Log, weil ein leerer Katalog und ein kaputter von außen gleich aussehen.
+**A missing table does not take the checkout with it.** Between `composer require` and
+`php artisan migrate` there are minutes on a real host and months on a forgotten staging box. In
+that window the catalogue answers as if the addon were not installed — and writes it to the log,
+because an empty catalogue and a broken one look the same from outside.
