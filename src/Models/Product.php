@@ -166,6 +166,24 @@ class Product extends Model
             'amount_cent' => $this->amount_cent,
             'currency' => $this->currency(),
             'digital' => $this->digital,
+            // Wem diese Zeile gehoert.
+            //
+            // Der Katalogeintrag ist die einzige Naht zu `statamic-payments`:
+            // das Paket kennt dieses Modell nicht und darf es nicht kennen,
+            // weil die Abhaengigkeit nur in eine Richtung geht. Seit dessen
+            // 1.24.1 stempelt `FollowUp::brandFor()` eine Folgezahlung mit
+            // dieser Angabe, statt die Marke der Vorgaengerzahlung zu erben —
+            // ohne den Schluessel greift dort immer das Erbe, und ein Upsell
+            // aus einem Funnel mit fremdem Produkt wird unter der falschen
+            // Marke verkauft, mit deren Rechnungsserie und Absender.
+            //
+            // Immer mitgeschickt, auch als `0`, und darin anders als `grants`
+            // und `interval` darunter. Die Null ist hier eine Aussage — „diese
+            // Zeile gehoert keiner Marke", der Normalfall ohne Mandanten — und
+            // drueben fuehrt sie zum Erbe mit einer `info`-Zeile. Ein
+            // fehlender Schluessel dagegen saehe genauso aus wie eine aeltere
+            // Fassung dieses Addons, und die beiden sind nicht dasselbe.
+            'brand_id' => (int) $this->brand_id,
         ];
 
         // Omitted rather than sent as an empty list. `statamic-payments` reads

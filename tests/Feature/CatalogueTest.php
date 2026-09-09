@@ -151,6 +151,36 @@ class CatalogueTest extends TestCase
     }
 
     #[Test]
+    public function a_product_names_the_brand_it_belongs_to(): void
+    {
+        // Der Katalogeintrag ist die einzige Naht zu `statamic-payments`, und
+        // seit dessen 1.24.1 stempelt `FollowUp::brandFor()` eine Folgezahlung
+        // mit **dieser** Angabe statt mit der geerbten Marke der
+        // Vorgaengerzahlung. Ohne den Schluessel ist der Fix drueben stiller
+        // toter Code und ein Upsell wird weiter unter der falschen Marke
+        // verkauft — mit Rechnungsserie und Absender daran.
+        $this->product(['brand_id' => 7]);
+
+        // Streng auf `int`: drueben nimmt die Lesart eine Ziffernfolge im Text
+        // zwar an, aber ein Array verwirft sie. Was hier herausgeht, soll die
+        // eindeutige Form haben.
+        $this->assertSame(7, app(Catalogue::class)->find('atemkurs')['brand_id']);
+    }
+
+    #[Test]
+    public function a_product_on_a_single_brand_install_names_zero_rather_than_nothing(): void
+    {
+        // Null ist auf einem Betrieb ohne Mandanten jede Zeile. Der Schluessel
+        // fehlt trotzdem nicht: drueben ist `0` die ausdrueckliche Aussage
+        // „nennt keine Marke", die zum Erbe der Vorgaengerzahlung fuehrt und
+        // eine `info`-Zeile schreibt. Ein fehlender Schluessel saehe genauso
+        // aus wie eine aeltere Fassung dieses Addons.
+        $this->product();
+
+        $this->assertSame(0, app(Catalogue::class)->find('atemkurs')['brand_id']);
+    }
+
+    #[Test]
     public function without_products_nothing_changes(): void
     {
         $catalogue = app(Catalogue::class);

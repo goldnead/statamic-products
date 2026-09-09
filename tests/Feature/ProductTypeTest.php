@@ -451,8 +451,12 @@ class ProductTypeTest extends TestCase
 
         $this->assertArrayNotHasKey('type', $entry);
         $this->assertArrayNotHasKey('ref', $entry);
+        // `brand_id` seit 1.6.1: wem die Zeile gehoert, nicht was geliefert
+        // wird. Die Grenze oben bleibt damit unangetastet — es ist eine
+        // Zuordnung fuer Rechnungsserie und Absender, nichts, worauf eine
+        // Kasse handeln koennte.
         $this->assertSame(
-            ['handle', 'name', 'amount_cent', 'currency', 'digital'],
+            ['handle', 'name', 'amount_cent', 'currency', 'digital', 'brand_id'],
             array_keys($product->toCatalogueEntry()),
         );
     }

@@ -83,7 +83,7 @@ Offer::create([
 | `digital` | A tax fact, not a medium: it decides the place of supply and with it the mandatory notice (§ 3a UStG). **No default** — whoever creates a product answers it. |
 | `grants` | The access a paid copy opens, as a list. Empty is normal. |
 | `active` | Retired rather than deleted. |
-| `brand_id` | Zero on every single-brand install. An agency with three brands gets three catalogues. |
+| `brand_id` | Zero on every single-brand install. An agency with three brands gets three catalogues. Travels in the catalogue entry: `statamic-payments` 1.24.1 and newer stamps a follow-up charge with it instead of inheriting the brand of the payment it follows, and reads zero as "names no brand". |
 
 What is deliberately *not* here: discounts, sales copy, placement, bundling. That is the offer
 level and it already exists in `statamic-offers`. A product has a list price and no opinion about

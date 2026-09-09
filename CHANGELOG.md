@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.6.1 — 2026-09-09
+
+### Fixed: the catalogue entry names the brand the product belongs to
+
+`toCatalogueEntry()` sent handle, name, price, currency and `digital`, and said nothing about whose
+product it is. The catalogue entry is the only seam to `statamic-payments` — that package does not
+know this model and must not, because the dependency runs one way only — and since its 1.24.1
+`FollowUp::brandFor()` stamps a follow-up charge with the `brand_id` it finds there instead of
+inheriting the brand of the payment it follows.
+
+Without the key that fix was dead code on every install: every follow-up landed in the inherit
+branch, and an upsell out of a funnel whose product belongs to another brand went on being sold
+under the wrong one, with that brand's invoice series and sender on it.
+
+Always sent, `0` included, and in that unlike `grants` and `interval` which are omitted when empty.
+Zero is a statement here — "this line belongs to no brand", the normal case without tenants — and
+over there it leads to the inheritance plus a line in the log. A missing key would look exactly like
+an older version of this addon, and those two are not the same thing.
+
 ## 1.6.0 — 2026-09-08
 
 ### Changed: the products screen shows an empty state instead of HTTP 500 when its table is missing
