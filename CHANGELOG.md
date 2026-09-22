@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.2 — 2026-09-22
+
+### Fixed: the product title in the listing centered instead of aligning left
+
+The title cell is a `<button>` so it can open the edit panel, and a browser's default
+`text-align` for `<button>` is `center` — nothing in the column definition asked for that, the
+cell itself is left-aligned. It only became visible once a title wrapped onto a second line. The
+button now carries `text-start` explicitly, matching the pattern already used for the session
+buttons in `statamic-clientrooms`.
+
 ## 1.6.1 — 2026-09-09
 
 ### Fixed: the catalogue entry names the brand the product belongs to

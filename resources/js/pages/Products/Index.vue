@@ -232,7 +232,7 @@ function confirmRemove() {
             push-query
         >
             <template #cell-name="{ row }">
-                <button type="button" class="font-medium hover:text-primary" @click="edit(row)">
+                <button type="button" class="text-start font-medium hover:text-primary" @click="edit(row)">
                     {{ row.name }}
                 </button>
                 <!-- Which product it is. Every column is toggleable, this one
