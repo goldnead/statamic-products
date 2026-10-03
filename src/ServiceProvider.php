@@ -5,6 +5,7 @@ namespace Goldnead\StatamicProducts;
 use Goldnead\StatamicPayments\Cp\SuiteNav;
 use Goldnead\StatamicPayments\Support\Brands;
 use Goldnead\StatamicPayments\Support\Catalogue;
+use Goldnead\StatamicProducts\Http\Controllers\Cp\AccessesController;
 use Goldnead\StatamicProducts\Http\Controllers\Cp\ProductsController;
 use Goldnead\StatamicProducts\Models\Product;
 use Illuminate\Support\Facades\Log;
@@ -169,6 +170,15 @@ class ServiceProvider extends AddonServiceProvider
                 ->icon('shopping-cart')
                 ->route('utilities.products')
                 ->can('access products utility');
+
+            // Zugaenge direkt darunter, aus demselben Grund wie oben.
+            $nav->remove('Tools', 'Utilities', __('statamic-products::messages.accesses_title'));
+
+            $nav->create(__('statamic-products::messages.accesses_title'))
+                ->section($section)
+                ->icon('key')
+                ->route('utilities.product-accesses')
+                ->can('access product-accesses utility');
         });
 
         // Inside `Utility::extend`, not straight in boot: `__()` during boot
@@ -197,6 +207,25 @@ class ServiceProvider extends AddonServiceProvider
                     $router->get('{product}', [ProductsController::class, 'show'])->name('show')->whereNumber('product');
                     $router->patch('{product}', [ProductsController::class, 'update'])->name('update')->whereNumber('product');
                     $router->delete('{product}', [ProductsController::class, 'destroy'])->name('destroy')->whereNumber('product');
+                });
+
+            // Zugaenge: eine eigene Utility, damit sie ein eigenes Recht hat.
+            // `product-accesses` statt `accesses`, weil Utility-Kennungen im
+            // ganzen CP geteilt sind. Dieselbe Routenform wie bei den Produkten,
+            // `new` statt `create` aus demselben Grund.
+            Utility::register('product-accesses')
+                ->action([AccessesController::class, 'index'])
+                ->title(__('statamic-products::messages.accesses_title'))
+                ->navTitle(__('statamic-products::messages.accesses_title'))
+                ->icon('key')
+                ->description(__('statamic-products::messages.accesses_description'))
+                ->docsUrl('https://github.com/goldnead/statamic-products#accesses')
+                ->routes(function ($router) {
+                    $router->post('/', [AccessesController::class, 'store'])->name('store');
+                    $router->get('new', [AccessesController::class, 'create'])->name('create');
+                    $router->get('{access}', [AccessesController::class, 'show'])->name('show')->whereNumber('access');
+                    $router->patch('{access}', [AccessesController::class, 'update'])->name('update')->whereNumber('access');
+                    $router->delete('{access}', [AccessesController::class, 'destroy'])->name('destroy')->whereNumber('access');
                 });
         });
 

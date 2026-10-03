@@ -5,6 +5,7 @@ namespace Goldnead\StatamicProducts\Http\Controllers\Cp;
 use Goldnead\StatamicPayments\Support\Catalogue;
 use Goldnead\StatamicProducts\Http\Resources\Cp\ListedProduct;
 use Goldnead\StatamicProducts\Http\Resources\Cp\ProductsCollection;
+use Goldnead\StatamicProducts\Models\Access;
 use Goldnead\StatamicProducts\Models\Product;
 use Goldnead\StatamicProducts\Support\ProductContext;
 use Goldnead\StatamicProducts\Support\RefTarget;
@@ -13,6 +14,7 @@ use Goldnead\StatamicProducts\Support\SoldHandles;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -128,7 +130,62 @@ class ProductsController extends CpController
                 'ref_label' => __('statamic-products::messages.ref_'.$type),
                 'needs_ref' => in_array($type, Product::typesNeedingRef(), true),
             ])->all(),
+            // Die Auswahl fuer „Schaltet frei (Zugänge)": die Zugaenge dieser
+            // Marke. Gespeichert wird weiter der Slug, Zahlungen und Vergaben
+            // merken vom Picker nichts.
+            'accesses' => $this->accessOptions(),
         ];
+    }
+
+    /**
+     * @return list<array{value: string, label: string}>
+     */
+    protected function accessOptions(): array
+    {
+        if (! Schema::hasTable('product_accesses')) {
+            return [];
+        }
+
+        return Access::query()->forBrand()->orderBy('name')->get(['handle', 'name'])
+            ->map(fn (Access $access) => ['value' => $access->handle, 'label' => $access->name])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Die Slugs dieses Produkts, zu denen es keinen Zugang gibt.
+     *
+     * Bestand, kein Fehler: bis zur Uebernahme fuehrt die Website manche
+     * Zugaenge noch selbst. Vergeben werden sie weiter; das Formular sagt nur,
+     * dass hier nicht steht, was sie enthalten.
+     *
+     * @return list<string>
+     */
+    protected function unresolvedGrants(Product $product): array
+    {
+        $slugs = $product->grantSlugs();
+
+        if ($slugs === [] || ! Schema::hasTable('product_accesses')) {
+            return $slugs;
+        }
+
+        $known = Access::query()->whereIn('handle', $slugs)->pluck('handle')->all();
+
+        return array_values(array_diff($slugs, $known));
+    }
+
+    /**
+     * Ob einer der Slugs ein Zugang mit eigenem Datensatz ist.
+     *
+     * @param  mixed  $grants
+     */
+    protected function grantsAnAccess($grants): bool
+    {
+        $slugs = array_values(array_filter((array) $grants, fn ($slug) => is_string($slug) && $slug !== ''));
+
+        return $slugs !== []
+            && Schema::hasTable('product_accesses')
+            && Access::query()->whereIn('handle', $slugs)->exists();
     }
 
     /**
@@ -163,6 +220,7 @@ class ProductsController extends CpController
                 'ref_missing' => $row['ref_missing'],
                 'shadowed' => $row['shadowed'],
                 'sold' => $product->hasBeenSold(),
+                'unresolved_grants' => $this->unresolvedGrants($product),
             ],
             'form' => $this->formContext(),
             'updateUrl' => cp_route('utilities.products.update', $product->id),
@@ -242,8 +300,13 @@ class ProductsController extends CpController
             // world. It is nulled below rather than rejected, because changing
             // a kind is a normal edit and should not need the field cleared by
             // hand first.
+            //
+            // Ausser ein freigeschalteter Zugang fuehrt die Inhalte: dann steht
+            // dort, worauf der Kauf zeigt, und ein zweiter Verweis hier waere
+            // eine zweite Wahrheit.
             'ref' => [
-                Rule::requiredIf(fn () => in_array($request->input('type'), Product::typesNeedingRef(), true)),
+                Rule::requiredIf(fn () => in_array($request->input('type'), Product::typesNeedingRef(), true)
+                    && ! $this->grantsAnAccess($request->input('grants', $product?->grantSlugs() ?? []))),
                 'nullable', 'string', 'max:191',
             ],
             'handle' => [
@@ -512,6 +575,7 @@ class ProductsController extends CpController
             'field_grants' => __('statamic-products::messages.field_grants'),
             'field_grants_help' => __('statamic-products::messages.field_grants_help'),
             'field_grants_placeholder' => __('statamic-products::messages.field_grants_placeholder'),
+            'grants_unresolved' => __('statamic-products::messages.grants_unresolved'),
             'field_type' => __('statamic-products::messages.field_type'),
             'field_type_help' => __('statamic-products::messages.field_type_help'),
             'field_ref_help' => __('statamic-products::messages.field_ref_help'),
