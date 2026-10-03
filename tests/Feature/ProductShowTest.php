@@ -172,7 +172,7 @@ class ProductShowTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('statamic-products::Products/Show')
-                ->where('product.handle', 'atemkurs')
+                ->where('product.values.handle', 'atemkurs')
                 ->has('offers', 2)
                 // Active first, then by name.
                 ->where('offers.0.handle', 'fruehling')

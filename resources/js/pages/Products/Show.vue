@@ -1,30 +1,69 @@
 <script setup>
-import { computed } from 'vue';
-import { Head } from '@statamic/cms/inertia';
-import {
-    Header, Button, Badge, Panel, Card, Text, DocsCallout, Listing,
-} from '@statamic/cms/ui';
-
 /**
- * One product, seen from the rest of the family.
+ * Ein Produkt: Detailseite und Formular in einem.
  *
- * The row is edited in the stack on the listing. This screen answers the two
- * questions the listing cannot: who sells it, and who bought it. Each section
- * is there only when the sibling that knows is installed — `null` means the
- * question cannot be asked here, and a section that says "nobody" when the
- * truth is "no idea" is the wrong kind of quiet.
+ * Vorher oeffnete ein Klick auf die Zeile einen Stack, und diese Seite zeigte
+ * nur Pillen. Beim Collection-Entry gibt es diesen Bruch nicht: die Seite ist
+ * das Formular, gespeichert wird oben rechts, geloescht im „…"-Menue daneben.
  *
- * Both sections are core's listing in client mode, so they sort like Entries
- * and look like Entries. Every label arrives finished in `t`.
+ * Darunter steht, was der Rest der Familie ueber das Produkt weiss: welche
+ * Angebote es verkaufen und wer es gekauft hat. Jeder Abschnitt ist nur da,
+ * wenn das Geschwister-Addon installiert ist. `null` heisst „kann hier nicht
+ * gefragt werden", eine leere Liste „niemand", und der Bildschirm zeigt beides
+ * verschieden.
+ *
+ * Beide Tabellen sind core's Listing im Client-Modus. Jede Beschriftung kommt
+ * fertig in `t`.
  */
+import { computed, ref } from 'vue';
+import { Head, router } from '@statamic/cms/inertia';
+import {
+    Header, Button, Badge, CardPanel, Text, DocsCallout, Listing, Alert, Heading,
+    Dropdown, DropdownMenu, DropdownItem, ConfirmationModal, CommandPaletteItem,
+} from '@statamic/cms/ui';
+import ProductFields from './Fields.vue';
+
 const props = defineProps({
     product: { type: Object, required: true },
+    form: { type: Object, required: true },
+    updateUrl: { type: String, required: true },
+    deleteUrl: { type: String, required: true },
     offers: { type: Array, default: null },
     buyers: { type: Array, default: null },
     buyersLimit: { type: Number, default: 50 },
     indexUrl: { type: String, required: true },
     t: { type: Object, required: true },
 });
+
+const values = ref({ ...props.product.values });
+const errors = ref({});
+const saving = ref(false);
+const confirmingDelete = ref(false);
+
+function save() {
+    saving.value = true;
+
+    router.patch(props.updateUrl, values.value, {
+        preserveScroll: true,
+        onError: (e) => { errors.value = e || {}; },
+        onSuccess: () => { errors.value = {}; },
+        onFinish: () => { saving.value = false; },
+    });
+}
+
+// A sold product refuses deletion; the server answers with a validation error
+// on `handle`, which has no free field to sit at while the handle is locked, so
+// it is shown as a banner. A delete that silently does nothing is worse than a no.
+const deleteError = ref(null);
+
+function destroy() {
+    confirmingDelete.value = false;
+    deleteError.value = null;
+
+    router.delete(props.deleteUrl, {
+        onError: (e) => { deleteError.value = e?.handle || props.t.delete_refused_sold; },
+    });
+}
 
 const buyersHint = computed(() => props.t.section_buyers_hint.replace(':limit', String(props.buyersLimit)));
 
@@ -47,14 +86,9 @@ const buyerColumns = computed(() => [
     column('url', '', { sortable: false }),
 ]);
 
-// The listing wants an id per row. A buyer may appear twice — two lines of
-// one product on one payment — so the index goes into it.
+// The listing wants an id per row. A buyer may appear twice (two lines of one
+// product on one payment), so the index goes into it.
 const buyerItems = computed(() => (props.buyers || []).map((buyer, index) => ({ id: `${buyer.payment_id}-${index}`, ...buyer })));
-
-const facts = computed(() => [
-    [props.t.field_type, props.product.type_label],
-    [props.t.field_digital, props.product.digital ? props.t.digital_yes : props.t.digital_no],
-]);
 
 function paidAt(iso) {
     if (!iso) return '—';
@@ -71,61 +105,49 @@ function paidAt(iso) {
     <div class="max-w-page mx-auto" data-max-width-wrapper>
         <Head :title="[product.name, t.title]" />
 
-        <Header :title="product.name" icon="shopping-cart">
-            <Button :href="indexUrl" :text="t.back_to_list" />
+        <!-- Kernreihenfolge: erst das „…"-Menue, die Hauptaktion zuletzt. Loeschen
+             ist ein `DropdownItem variant="destructive"`; `Button variant="danger"`
+             gehoert nur auf den Bestaetigungsknopf im Dialog. -->
+        <Header :title="values.name || product.name" icon="shopping-cart">
+            <Dropdown>
+                <DropdownMenu>
+                    <DropdownItem :text="t.back_to_list" icon="arrow-left" :href="indexUrl" />
+                    <DropdownItem
+                        :text="t.delete_action"
+                        icon="trash"
+                        variant="destructive"
+                        @click="confirmingDelete = true"
+                    />
+                </DropdownMenu>
+            </Dropdown>
+            <CommandPaletteItem
+                category="Actions"
+                :text="t.save"
+                icon="save"
+                :action="save"
+                prioritize
+                v-slot="{ text, action }"
+            >
+                <Button variant="primary" :text="text" :disabled="saving" @click="action" />
+            </CommandPaletteItem>
         </Header>
 
-        <div class="space-y-6">
-            <!-- The facts, the way core's entry sidebar shows meta: a short
-                 label/value list, no form controls. Editing is one click away
-                 on the listing. -->
-            <Panel :heading="t.facts_heading">
-                <Card class="p-0!">
-                    <dl class="divide-y divide-content-border text-sm">
-                        <div class="flex gap-4 px-4 py-2.5">
-                            <dt class="w-48 shrink-0 text-gray-500 dark:text-gray-400">{{ t.field_handle }}</dt>
-                            <dd class="min-w-0">
-                                <span class="font-mono text-xs">{{ product.handle }}</span>
-                                <Badge v-if="product.sold" color="default" :text="t.sold_note" class="ms-2" />
-                            </dd>
-                        </div>
-                        <div class="flex gap-4 px-4 py-2.5">
-                            <dt class="w-48 shrink-0 text-gray-500 dark:text-gray-400">{{ t.field_amount }}</dt>
-                            <dd class="tabular-nums">
-                                {{ product.amount }}
-                                <span class="ms-1 text-2xs text-gray-500 dark:text-gray-400">{{ product.currency }}</span>
-                            </dd>
-                        </div>
-                        <div v-for="[label, value] in facts" :key="label" class="flex gap-4 px-4 py-2.5">
-                            <dt class="w-48 shrink-0 text-gray-500 dark:text-gray-400">{{ label }}</dt>
-                            <dd>{{ value }}</dd>
-                        </div>
-                        <div class="flex gap-4 px-4 py-2.5">
-                            <dt class="w-48 shrink-0 text-gray-500 dark:text-gray-400">{{ t.field_grants }}</dt>
-                            <dd class="min-w-0">
-                                <span v-if="product.grants.length === 0" class="text-gray-500 dark:text-gray-400">{{ t.grants_none }}</span>
-                                <span v-else class="flex flex-wrap gap-1">
-                                    <Badge v-for="slug in product.grants" :key="slug" color="default" :text="slug" class="font-mono" />
-                                </span>
-                            </dd>
-                        </div>
-                        <div class="flex gap-4 px-4 py-2.5">
-                            <dt class="w-48 shrink-0 text-gray-500 dark:text-gray-400">{{ t.field_active }}</dt>
-                            <dd>
-                                <Badge :color="product.active ? 'green' : 'default'" :text="product.active ? t.yes : t.no" />
-                            </dd>
-                        </div>
-                    </dl>
-                </Card>
-            </Panel>
+        <Alert v-if="deleteError" variant="error" :text="deleteError" class="mb-4" />
 
+        <ProductFields :form="values" :errors="errors" :context="form" :product="product" :t="t">
+          <!-- Der vierte Tab: dieselbe weisse Karte im grauen Rahmen wie die
+               Formular-Tabs. Die Tabellen sind core's Listing und sitzen in der
+               Karte, jede unter ihrer Ueberschrift. -->
+          <template #related>
+            <CardPanel>
+              <div class="space-y-8">
             <!-- Offers: only when the offers addon is there. -->
-            <Panel v-if="offers !== null" :heading="t.section_offers" :subheading="t.section_offers_hint">
-                <Card v-if="offers.length === 0">
-                    <div class="py-8 text-center">
-                        <Text size="sm" variant="subtle">{{ t.offers_empty }}</Text>
-                    </div>
-                </Card>
+            <section v-if="offers !== null">
+                <Heading :text="t.section_offers" />
+                <Text size="sm" variant="subtle" class="mb-3">{{ t.section_offers_hint }}</Text>
+                <div v-if="offers.length === 0" class="py-8 text-center">
+                    <Text size="sm" variant="subtle">{{ t.offers_empty }}</Text>
+                </div>
                 <Listing
                     v-else
                     :items="offers"
@@ -157,15 +179,15 @@ function paidAt(iso) {
                         </div>
                     </template>
                 </Listing>
-            </Panel>
+            </section>
 
             <!-- Buyers: only once the payments tables exist. -->
-            <Panel v-if="buyers !== null" :heading="t.section_buyers" :subheading="buyersHint">
-                <Card v-if="buyers.length === 0">
-                    <div class="py-8 text-center">
-                        <Text size="sm" variant="subtle">{{ t.buyers_empty }}</Text>
-                    </div>
-                </Card>
+            <section v-if="buyers !== null">
+                <Heading :text="t.section_buyers" />
+                <Text size="sm" variant="subtle" class="mb-3">{{ buyersHint }}</Text>
+                <div v-if="buyers.length === 0" class="py-8 text-center">
+                    <Text size="sm" variant="subtle">{{ t.buyers_empty }}</Text>
+                </div>
                 <Listing
                     v-else
                     :items="buyerItems"
@@ -196,8 +218,22 @@ function paidAt(iso) {
                         </div>
                     </template>
                 </Listing>
-            </Panel>
-        </div>
+            </section>
+              </div>
+            </CardPanel>
+          </template>
+        </ProductFields>
+
+        <!-- `:open`, not `v-if`: the modal owns its visibility and focus trap. -->
+        <ConfirmationModal
+            :open="confirmingDelete"
+            :title="t.delete_title"
+            :body-text="t.delete_body.replace(':name', product.name)"
+            :button-text="t.delete_action"
+            danger
+            @update:open="confirmingDelete = $event"
+            @confirm="destroy"
+        />
 
         <DocsCallout
             :topic="t.title"

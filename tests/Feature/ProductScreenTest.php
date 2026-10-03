@@ -119,6 +119,62 @@ class ProductScreenTest extends TestCase
     }
 
     #[Test]
+    public function the_detail_page_is_the_form_and_carries_its_own_urls(): void
+    {
+        $product = $this->product(['grants' => ['kurs']]);
+
+        $this->actingAs($this->user())
+            ->get('/cp/utilities/products/'.$product->id)
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('statamic-products::Products/Show')
+                ->where('product.values.name', 'Bestand')
+                ->where('product.values.grants', ['kurs'])
+                ->where('updateUrl', fn ($url) => str_ends_with((string) $url, '/utilities/products/'.$product->id))
+                ->where('deleteUrl', fn ($url) => str_ends_with((string) $url, '/utilities/products/'.$product->id))
+                ->has('form.types')
+            );
+    }
+
+    #[Test]
+    public function creating_has_a_page_of_its_own_and_lands_on_the_new_product(): void
+    {
+        $this->actingAs($this->user())
+            ->get('/cp/utilities/products/new')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('statamic-products::Products/Create')
+                ->has('form.types')
+                ->has('storeUrl'));
+
+        $response = $this->actingAs($this->user())
+            ->post('/cp/utilities/products', $this->valid());
+
+        $product = Product::firstWhere('handle', 'atemkurs');
+        $response->assertRedirect(cp_route('utilities.products.show', $product->id));
+    }
+
+    #[Test]
+    public function deleting_returns_to_the_list_not_to_the_page_that_is_gone(): void
+    {
+        $product = $this->product();
+
+        $this->actingAs($this->user())
+            ->delete('/cp/utilities/products/'.$product->id)
+            ->assertRedirect(cp_route('utilities.products'));
+    }
+
+    #[Test]
+    public function the_detail_and_create_pages_are_locked_without_the_permission(): void
+    {
+        $product = $this->product();
+        $user = $this->userWithoutPermission();
+
+        $this->actingAs($user)->getJson('/cp/utilities/products/'.$product->id)->assertForbidden();
+        $this->actingAs($user)->getJson('/cp/utilities/products/new')->assertForbidden();
+    }
+
+    #[Test]
     public function a_product_can_be_created_and_changed(): void
     {
         $this->actingAs($this->user())

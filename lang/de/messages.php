@@ -15,7 +15,7 @@ return [
     'column_handle' => 'Kennung',
     'column_amount' => 'Listenpreis',
     'column_digital' => 'Leistung',
-    'column_grants' => 'Schaltet frei',
+    'column_grants' => 'Schaltet frei (Zugänge)',
     'column_active' => 'Aktiv',
 
     'new_product' => 'Neues Produkt',
@@ -51,8 +51,8 @@ return [
     'digital_yes' => 'Elektronisch erbracht',
     'digital_no' => 'Vor Ort oder auf Papier',
 
-    'field_grants' => 'Schaltet frei',
-    'field_grants_help' => 'Was ein bezahltes Exemplar öffnet. Mehrere sind erlaubt, leer heißt: nichts.',
+    'field_grants' => 'Schaltet frei (Zugänge)',
+    'field_grants_help' => 'Die Zugänge, die ein bezahltes Exemplar öffnet. Hier steht nur der Name; was ein Zugang enthält, entscheidet die Website. Mehrere sind erlaubt, leer heißt: nichts.',
     'field_grants_placeholder' => 'Zugang hinzufügen',
 
     'column_type' => 'Art',
@@ -97,6 +97,12 @@ return [
     'show_action' => 'Angebote und Käufer',
     'back_to_list' => 'Alle Produkte',
     'facts_heading' => 'Produkt',
+    'create_product' => 'Produkt anlegen',
+    'section_basics' => 'Grundlagen',
+    'section_price' => 'Preis und Zahlung',
+    'section_supply' => 'Leistung und Zugänge',
+    'section_visibility' => 'Sichtbarkeit',
+    'field_active_help' => 'Ein inaktives Produkt fehlt im Katalog und lässt sich nicht verkaufen. Bereits Gekauftes bleibt lesbar.',
     'section_offers' => 'Angebote',
     'section_offers_hint' => 'Jedes Angebot, das dieses Produkt verkauft: als Hauptprodukt oder im Bündel.',
     'offers_empty' => 'Kein Angebot enthält dieses Produkt. Es lässt sich damit nur direkt über die Kennung verkaufen.',

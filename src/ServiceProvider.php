@@ -184,9 +184,19 @@ class ServiceProvider extends AddonServiceProvider
                 ->docsUrl('https://github.com/goldnead/statamic-products#readme')
                 ->routes(function ($router) {
                     $router->post('/', [ProductsController::class, 'store'])->name('store');
-                    $router->get('{product}', [ProductsController::class, 'show'])->name('show');
-                    $router->patch('{product}', [ProductsController::class, 'update'])->name('update');
-                    $router->delete('{product}', [ProductsController::class, 'destroy'])->name('destroy');
+                    // `new` before `{product}`, and `{product}` only takes digits,
+                    // so neither can swallow the other.
+                    //
+                    // Not `/create`, though the route is named that: core's nav
+                    // treats any URL ending in `/create` or `/edit` as a
+                    // descendant of every item whose URL it starts with, and
+                    // "Hilfsmittel" (`utilities`) starts it. That item sits in
+                    // an earlier section, wins the breadcrumb and the highlight,
+                    // and the create page then claims to be a utility.
+                    $router->get('new', [ProductsController::class, 'create'])->name('create');
+                    $router->get('{product}', [ProductsController::class, 'show'])->name('show')->whereNumber('product');
+                    $router->patch('{product}', [ProductsController::class, 'update'])->name('update')->whereNumber('product');
+                    $router->delete('{product}', [ProductsController::class, 'destroy'])->name('destroy')->whereNumber('product');
                 });
         });
 
