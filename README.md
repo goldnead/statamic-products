@@ -227,8 +227,68 @@ slugs, so payments and entitlements notice nothing. A slug without an access rec
 is listed below the picker as unresolved, not as an error. `ref` becomes optional when one of the
 granted slugs is an access, because the access then keeps the contents.
 
-Credits apply to the access granted directly, never through nesting. Reading accesses (a lookup
-API and a transitive `PackageResolver` for `statamic-entitlements`) is not part of this release.
+### Setting it up on a site
+
+Everything a site tells this addon goes into the `boot()` of one of its service providers:
+
+```php
+use Goldnead\StatamicProducts\Support\AccessContainers;
+use Goldnead\StatamicProducts\Support\ContentKinds;
+use Goldnead\StatamicProducts\Support\SessionTypes;
+
+ContentKinds::register('community', 'Community-Bereich', 'Space (Kennung)');
+SessionTypes::register('8f0c…', 'Einzelsession');
+AccessContainers::allow(['assets', 'downloads']);
+```
+
+With `goldnead/statamic-entitlements` (^1.4) installed there is nothing else to do: the addon puts
+its own `PackageResolver` in place of entitlements' empty default, and a grant on an access then
+covers everything the access contains. **A resolver the site binds itself always wins**, whatever
+order the providers run in; the addon only replaces `NullPackageResolver`. To keep bundles off
+entirely, bind a resolver that returns `[]`. Without entitlements the addon binds nothing and works
+as before.
+
+### What a grant covers
+
+The same rules for the resolver and for `Accesses` below:
+
+- A grant on an access covers the `ref` of each of its contents, and through contents of kind
+  `access` everything the nested access covers, at any depth. So
+  `Entitlements::allows($user, 'cvt-101')` is true for a grant on an access that holds `cvt-101` two
+  levels down.
+- For a `course` the key is its entry id **and** the slug `statamic-courses` asks about (the entry's
+  `product` field, else its slug).
+- **An inactive access passes nothing on.** It covers nothing, not even for whoever holds it
+  directly, and what it contains is not reached through it. Its own slug still counts as content of
+  the access around it, like a pointer to an access that has no record.
+- Cycles end; every access is entered once.
+- Across all brands: slugs are unique over every brand and a grant carries none.
+- All accesses are read once per request (also per Octane request and queued job), and a save or
+  delete of an access is visible to the next read in the same request. If the table cannot be read
+  (before `php artisan migrate`) the resolver answers "no bundles" and logs an error instead of
+  failing the page.
+
+### Reading accesses
+
+```php
+use Goldnead\StatamicProducts\Support\Accesses;
+
+$access = Accesses::find('choiraccelerator');   // null when there is no record
+
+$access->expand();                // every slug a grant covers, transitive, without its own
+$access->creditLines();           // this access's credit lines for new grants
+$access->creditLines(includeEnded: true);       // ... including ended ones, to replay an old grant
+$access->contentsOf('course');    // contents of one kind, nested accesses included, in order
+$access->model();                 // the Access model, to write or for its own contents only
+```
+
+`find()` also returns inactive accesses, because replaying an old grant needs their credit lines;
+`expand()` and `contentsOf()` of an inactive access are empty. `expand()` is the exact inverse of
+the resolver: for each slug it lists, the resolver names this access.
+
+**Credits apply to the access granted directly, never through nesting.** `creditLines()` reads the
+access itself and nothing it contains, so nesting a coaching access into a bundle does not credit
+sessions twice.
 
 ## What it will not do
 
@@ -246,7 +306,8 @@ API and a transitive `PackageResolver` for `statamic-entitlements`) is not part 
 - Statamic 6
 - `goldnead/statamic-payments` ^1.15
 
-Optional: `goldnead/statamic-brand-context` for multi-brand catalogues.
+Optional: `goldnead/statamic-brand-context` for multi-brand catalogues,
+`goldnead/statamic-entitlements` ^1.4 for grants that cover what an access contains.
 
 ## Licence
 

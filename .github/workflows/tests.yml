@@ -56,6 +56,29 @@ jobs:
       - name: Run tests
         run: vendor/bin/phpunit
 
+  # statamic-entitlements is optional (require-dev, suggest). The resolver is
+  # only bound when its interface exists, and this leg proves the addon boots
+  # and passes without it: the resolver tests skip, everything else must run.
+  without-entitlements:
+    runs-on: ubuntu-latest
+    name: Without statamic-entitlements
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, intl, fileinfo
+          coverage: none
+
+      - run: composer install --prefer-dist --no-interaction
+
+      - run: composer remove --dev goldnead/statamic-entitlements --no-interaction
+
+      - name: Run tests
+        run: vendor/bin/phpunit
+
   lint:
     runs-on: ubuntu-latest
     name: Code style

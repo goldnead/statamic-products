@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.7.0 — unreleased
+
+Minor: new table, new API, nothing removed. Not tagged until CI is green.
 
 ### Added: accesses, the record behind a grant slug
 
@@ -35,6 +37,28 @@ registration client-room containers are left out. Files from other containers ar
 
 Still stores slugs; payments and entitlements see no difference. Slugs without an access record
 stay valid and are listed as unresolved. `ref` is optional when a granted slug is an access.
+
+### Added: a transitive `PackageResolver` for statamic-entitlements
+
+With `goldnead/statamic-entitlements` ^1.4 installed, a grant on an access also covers what it
+contains, nested accesses included: `Entitlements::allows($user, 'cvt-101')` is true for a grant on
+an access holding `cvt-101` two levels down. A course is found by its entry id and by the slug
+`statamic-courses` asks about. Bound only in place of entitlements' `NullPackageResolver`, so a
+resolver the site binds itself keeps winning. Without entitlements nothing is bound and the addon
+boots as before (CI has a leg without it).
+
+The rule for inactive accesses: **an inactive access passes nothing on.** It covers nothing, and
+what it contains is not reached through it; its own slug still counts as content of the access
+around it. Cycles end, brands do not split the graph, all accesses are read once per request, and
+a save in the same request is seen by the next read.
+
+### Added: `Accesses::find($slug)`, a read API for sites
+
+`->expand()` (every slug a grant covers, transitive; the inverse of the resolver),
+`->creditLines()` (this access only, never through nesting; ended lines left out unless
+`includeEnded: true`, for replaying an old grant), `->contentsOf($kind)` (nested accesses included,
+in order, each `ref` once) and `->model()`. `find()` also returns inactive accesses; what they open
+is empty.
 
 ## 1.6.2 — 2026-09-22
 
