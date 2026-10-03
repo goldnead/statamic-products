@@ -32,10 +32,14 @@ const saving = ref(false);
 const confirmingDelete = ref(false);
 const deleteError = ref(null);
 
+// Der Stand, den dieses Formular geladen hat. Hat inzwischen jemand anderes
+// gespeichert, lehnt der Server ab, statt dessen Aenderung zu ueberschreiben.
+const version = ref(props.access.version);
+
 function save() {
     saving.value = true;
 
-    router.patch(props.updateUrl, values.value, {
+    router.patch(props.updateUrl, { ...values.value, version: version.value }, {
         preserveScroll: true,
         onError: (e) => { errors.value = e || {}; },
         onSuccess: (page) => {
@@ -43,6 +47,7 @@ function save() {
             // Neue Zeilen haben jetzt ihre Nummer; ohne Nachladen schickte das
             // naechste Speichern sie noch einmal als neu.
             values.value = JSON.parse(JSON.stringify(page.props.access.values));
+            version.value = page.props.access.version;
         },
         onFinish: () => { saving.value = false; },
     });
@@ -97,6 +102,7 @@ const productColumns = computed(() => [
         </Header>
 
         <Alert v-if="deleteError" variant="error" :text="deleteError" class="mb-4" />
+        <Alert v-if="errors.version" variant="error" :text="errors.version" class="mb-4" />
 
         <AccessFields :form="values" :errors="errors" :context="form" :access="access" :t="t">
             <template #related>

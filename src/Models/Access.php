@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
@@ -110,18 +111,60 @@ class Access extends Model
      */
     protected function numberCreditLines(): void
     {
+        // Der Stand in der Datenbank, nicht `getOriginal()`. Zwei Prozesse, die
+        // denselben Datensatz halten, haben beide ein Original, und das des
+        // langsameren ist veraltet: mit ihm fiele der Zaehler zurueck, und eine
+        // neue Zeile bekaeme die Nummer, die der schnellere gerade vergeben hat.
+        $stored = $this->exists
+            ? DB::table($this->getTable())->where($this->getKeyName(), $this->getKey())->first(['handle', 'credits', 'credit_lines_issued'])
+            : null;
+
+        $storedIssued = (int) ($stored->credit_lines_issued ?? 0);
+        $storedLines = [];
+
+        foreach ((array) json_decode((string) ($stored->credits ?? '[]'), true) as $line) {
+            if (is_array($line) && is_int($line['line'] ?? null)) {
+                $storedLines[$line['line']] = $line;
+            }
+        }
+
+        $this->guardGranted($stored, $storedLines);
+
         $credits = $this->credits;
 
         if (! is_array($credits)) {
+            $this->credit_lines_issued = max($storedIssued, (int) ($this->credit_lines_issued ?? 0));
+
             return;
         }
 
-        $issued = (int) ($this->credit_lines_issued ?? 0);
+        $issued = max($storedIssued, (int) ($this->credit_lines_issued ?? 0));
+        $seen = [];
 
         foreach ($credits as $line) {
-            if (is_array($line) && is_int($line['line'] ?? null)) {
-                $issued = max($issued, $line['line'] + 1);
+            if (! is_array($line) || ! is_int($line['line'] ?? null)) {
+                continue;
             }
+
+            $number = $line['line'];
+
+            if (in_array($number, $seen, true)) {
+                throw ValidationException::withMessages([
+                    'credits' => __('statamic-products::messages.credit_line_duplicate', ['line' => $number]),
+                ]);
+            }
+
+            // Eine Nummer unter dem Zaehler, die heute an keiner Zeile steht,
+            // wurde schon einmal vergeben und wieder geloescht. Sie gehoerte zu
+            // einer anderen Zeile, und ihr Schluessel kann schon unterwegs sein.
+            if ($stored !== null && $number < $storedIssued && ! array_key_exists($number, $storedLines)) {
+                throw ValidationException::withMessages([
+                    'credits' => __('statamic-products::messages.credit_line_unknown'),
+                ]);
+            }
+
+            $seen[] = $number;
+            $issued = max($issued, $number + 1);
         }
 
         foreach ($credits as $i => $line) {
@@ -138,6 +181,70 @@ class Access extends Model
 
         $this->credits = array_values($credits);
         $this->credit_lines_issued = $issued;
+    }
+
+    /**
+     * Was nach einer Vergabe nicht mehr geht, gleich auf welchem Weg.
+     *
+     * Der Controller sagt es dem Formular mit besseren Worten. Hier steht es
+     * ein zweites Mal, weil Uebernahme und Import am Formular vorbei schreiben.
+     *
+     * @param  array<int, array<string, mixed>>  $storedLines
+     */
+    protected function guardGranted(?object $stored, array $storedLines): void
+    {
+        if ($stored === null || ! $this->isDirty(['handle', 'credits'])) {
+            return;
+        }
+
+        if (! self::slugGranted((string) $stored->handle)) {
+            return;
+        }
+
+        if ($this->handle !== $stored->handle) {
+            throw ValidationException::withMessages([
+                'handle' => __('statamic-products::messages.access_handle_frozen'),
+            ]);
+        }
+
+        $now = [];
+
+        foreach ((array) ($this->credits ?? []) as $line) {
+            if (is_array($line) && is_int($line['line'] ?? null)) {
+                $now[$line['line']] = $line;
+            }
+        }
+
+        $removed = array_values(array_diff(array_keys($storedLines), array_keys($now)));
+
+        if ($removed !== []) {
+            throw ValidationException::withMessages([
+                'credits' => trans_choice('statamic-products::messages.credit_line_not_deletable', count($removed), [
+                    'lines' => implode(', ', array_map(fn (int $n) => $n + 1, $removed)),
+                ]),
+            ]);
+        }
+
+        foreach ($storedLines as $number => $line) {
+            if (($line['ended_at'] ?? null) !== null && ($now[$number]['ended_at'] ?? null) === null) {
+                throw ValidationException::withMessages([
+                    'credits' => __('statamic-products::messages.credit_line_reopen'),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Ein Fingerabdruck des gespeicherten Stands.
+     *
+     * Das Formular schickt ihn beim Speichern zurueck. Passt er nicht mehr, hat
+     * jemand anderes inzwischen gespeichert, und dessen Stand wird nicht still
+     * ueberschrieben. Ueber den Inhalt und nicht ueber `updated_at`, weil zwei
+     * Speichervorgaenge in derselben Sekunde denselben Zeitstempel tragen.
+     */
+    public function version(): string
+    {
+        return sha1((string) json_encode($this->getRawOriginal()));
     }
 
     /**
@@ -198,8 +305,12 @@ class Access extends Model
      */
     public function hasBeenGranted(): bool
     {
-        $handle = (string) $this->getOriginal('handle', $this->handle);
+        return self::slugGranted((string) $this->getOriginal('handle', $this->handle));
+    }
 
+    /** Dasselbe fuer einen Slug, ohne Datensatz. */
+    public static function slugGranted(string $handle): bool
+    {
         if ($handle === '') {
             return false;
         }
@@ -239,15 +350,21 @@ class Access extends Model
 
         $graph[$handle] = self::nestedHandles($contents);
 
-        $walk = function (string $node, array $path) use (&$walk, $graph, $handle): ?array {
+        // Jeder Knoten wird einmal betreten. Ohne Merkliste kostet eine Kette aus
+        // Rauten (A zeigt auf B und C, beide auf D, …) zwei hoch Tiefe Wege.
+        $visited = [$handle => true];
+
+        $walk = function (string $node, array $path) use (&$walk, &$visited, $graph, $handle): ?array {
             foreach ($graph[$node] ?? [] as $next) {
                 if ($next === $handle) {
                     return [...$path, $next];
                 }
 
-                if (in_array($next, $path, true)) {
+                if (isset($visited[$next])) {
                     continue;
                 }
+
+                $visited[$next] = true;
 
                 if ($found = $walk($next, [...$path, $next])) {
                     return $found;

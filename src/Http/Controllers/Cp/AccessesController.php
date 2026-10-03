@@ -95,6 +95,7 @@ class AccessesController extends CpController
                 'values' => $row['edit_values'],
                 'targets' => $row['targets'],
                 'granted' => $access->hasBeenGranted(),
+                'version' => $access->version(),
             ],
             'form' => $this->formContext($access),
             'products' => $this->productsGranting($access),
@@ -119,7 +120,26 @@ class AccessesController extends CpController
     {
         $this->authorizeAccess();
 
-        $access->update($this->validated($request, $access));
+        // In einer Transaktion, gegen den frisch gelesenen Stand. Die Sperre
+        // hilft auf MySQL und Postgres; auf SQLite ist `lockForUpdate` nichts.
+        // Der eigentliche Schutz ist der Fingerabdruck: das Formular schickt
+        // mit, welchen Stand es geladen hat, und ein inzwischen geaenderter
+        // Datensatz wird nicht still ueberschrieben.
+        $access = DB::transaction(function () use ($request, $access) {
+            $fresh = Access::query()->lockForUpdate()->findOrFail($access->getKey());
+
+            $version = $request->input('version');
+
+            if (is_string($version) && $version !== '' && ! hash_equals($fresh->version(), $version)) {
+                throw ValidationException::withMessages([
+                    'version' => __('statamic-products::messages.access_stale'),
+                ])->status(409);
+            }
+
+            $fresh->update($this->validated($request, $fresh));
+
+            return $fresh;
+        });
 
         return back()->with('message', __('statamic-products::messages.saved', ['name' => $access->name]));
     }
@@ -301,7 +321,13 @@ class AccessesController extends CpController
             return;
         }
 
-        $known = array_map(fn (array $line) => $line['line'], $access?->creditLines() ?? []);
+        $stored = [];
+
+        foreach ($access?->creditLines() ?? [] as $line) {
+            $stored[$line['line']] = $line;
+        }
+
+        $known = array_keys($stored);
         $sent = [];
 
         foreach ((array) $request->input('credits', []) as $i => $line) {
@@ -322,6 +348,14 @@ class AccessesController extends CpController
             }
 
             $sent[] = $number;
+
+            // Nach einer Vergabe bleibt eine beendete Zeile beendet. Wieder
+            // geoeffnet, schriebe sie neuen Kaeufern Guthaben unter einem
+            // Schluessel gut, den die Website womoeglich schon abgeschlossen hat.
+            if ($granted && ($stored[$number]['ended_at'] ?? null) !== null
+                && ! filter_var($line['ended'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                $validator->errors()->add("credits.{$i}.ended", __('statamic-products::messages.credit_line_reopen'));
+            }
         }
 
         if (! $granted) {
@@ -331,8 +365,9 @@ class AccessesController extends CpController
         $removed = array_values(array_diff($known, $sent));
 
         if ($removed !== []) {
+            // Gezaehlt ab 1, wie der Bildschirm sie zeigt. Intern bleibt `line`.
             $validator->errors()->add('credits', trans_choice('statamic-products::messages.credit_line_not_deletable', count($removed), [
-                'lines' => implode(', ', $removed),
+                'lines' => implode(', ', array_map(fn (int $n) => $n + 1, $removed)),
             ]));
         }
     }
