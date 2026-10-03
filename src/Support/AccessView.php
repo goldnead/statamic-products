@@ -47,7 +47,7 @@ final class AccessView
      * Verschachtelte Zugaenge und der `ref` jedes Inhalts, ueber alle Ebenen;
      * bei Kursen dazu der Produkt-Slug, nach dem statamic-courses fragt. Genau
      * die Umkehrung des PackageResolvers: fuer jeden Slug hier nennt der
-     * Resolver diesen Zugang. Inaktiv: leer. Regeln: `AccessGraph`.
+     * Resolver diesen Zugang. Auch fuer inaktive. Regeln: `AccessGraph`.
      *
      * @return list<string>
      */
@@ -83,7 +83,7 @@ final class AccessView
     }
 
     /**
-     * Die Inhalte einer Art, auch aus verschachtelten aktiven Zugaengen.
+     * Die Inhalte einer Art, auch aus verschachtelten Zugaengen (aktiv oder nicht).
      *
      * In Reihenfolge, tiefe zuerst (ein verschachtelter Zugang steht an der
      * Stelle, an der er eingetragen ist), jeder `ref` einmal, an seiner ersten

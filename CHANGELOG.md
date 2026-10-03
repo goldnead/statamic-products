@@ -47,9 +47,10 @@ an access holding `cvt-101` two levels down. A course is found by its entry id a
 resolver the site binds itself keeps winning. Without entitlements nothing is bound and the addon
 boots as before (CI has a leg without it).
 
-The rule for inactive accesses: **an inactive access passes nothing on.** It covers nothing, and
-what it contains is not reached through it; its own slug still counts as content of the access
-around it. Cycles end, brands do not split the graph, all accesses are read once per request, and
+**`active` does not touch existing grants.** It only decides whether an access is offered and
+granted anew; a retired access resolves like an active one, directly and nested, as the switch in
+the Control Panel says ("existing grants stay valid"). Taking access away is `revoke()` in
+statamic-entitlements. Cycles end, brands do not split the graph, all accesses are read once per request, and
 a save in the same request is seen by the next read.
 
 ### Added: `Accesses::find($slug)`, a read API for sites
@@ -57,8 +58,8 @@ a save in the same request is seen by the next read.
 `->expand()` (every slug a grant covers, transitive; the inverse of the resolver),
 `->creditLines()` (this access only, never through nesting; ended lines left out unless
 `includeEnded: true`, for replaying an old grant), `->contentsOf($kind)` (nested accesses included,
-in order, each `ref` once) and `->model()`. `find()` also returns inactive accesses; what they open
-is empty.
+in order, each `ref` once) and `->model()`. `find()` also returns inactive accesses, with their
+full contents.
 
 ## 1.6.2 — 2026-09-22
 

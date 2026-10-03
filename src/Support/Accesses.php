@@ -21,9 +21,9 @@ final class Accesses
     /**
      * Der Zugang mit diesem Slug, auch ein inaktiver, sonst null.
      *
-     * Auch inaktive, weil eine alte Vergabe nachgespielt werden koennen muss
-     * und dafuer seine Guthabenzeilen braucht. Was er oeffnet, sagt `expand()`,
-     * und das ist bei einem inaktiven nichts.
+     * Auch inaktive: `active` sagt nur, ob er neu vergeben wird. Bestehende
+     * Vergaben gelten weiter, also liefern `expand()` und `contentsOf()` auch
+     * bei einem ausgemusterten Zugang seinen Inhalt.
      */
     public static function find(string $slug): ?AccessView
     {

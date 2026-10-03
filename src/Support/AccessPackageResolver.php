@@ -10,7 +10,7 @@ use Throwable;
  * Bringt statamic-entitlements bei, was ein Zugang enthaelt.
  *
  * entitlements fragt fuer jeden Slug, nach dem jemand Zugriff will: welche
- * anderen Slugs decken ihn ab? Die Antwort sind die aktiven Zugaenge, die ihn
+ * anderen Slugs decken ihn ab? Die Antwort sind die Zugaenge (auch ausgemusterte), die ihn
  * enthalten, auch ueber verschachtelte Zugaenge (Regeln: `AccessGraph`).
  *
  * Nur gebunden, wenn entitlements installiert ist, und nur anstelle von dessen

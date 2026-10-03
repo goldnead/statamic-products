@@ -24,10 +24,13 @@ use Throwable;
  *   `access` also der Slug des inneren Zugangs. Bei `course` zusaetzlich der
  *   Produkt-Slug des Kurses, so wie statamic-courses ihn fragt (Feld
  *   `product`, sonst der Slug des Eintrags).
- * - **Ein inaktiver Zugang reicht nichts weiter.** Er deckt nichts ab, auch
- *   nicht fuer den, der ihn direkt haelt, und seine Inhalte erreicht niemand
- *   ueber ihn. Sein Slug bleibt Inhalt seines Behaelters, wie ein Verweis auf
- *   einen Zugang ohne Datensatz.
+ * - **`active` zaehlt nicht.** Es steuert nur, ob ein Zugang neu vergeben oder
+ *   angeboten wird (Picker, neue Verkaeufe). Ein ausgemusterter Zugang wird
+ *   aufgeloest wie ein aktiver, direkt und verschachtelt: „Bestehende
+ *   Vergaben gelten weiter", sagt das CP am Schalter, und Altkaeufer eines
+ *   ausgemusterten Angebots behalten, was sie gekauft haben. Entzogen wird mit
+ *   `revoke()` in statamic-entitlements, nicht hier.
+ * - Ein Verweis auf einen Zugang ohne Datensatz deckt dessen Slug ab und endet.
  * - Kreise enden: jeder Zugang wird einmal betreten.
  * - Ueber alle Marken. Slugs sind ueber alle Marken eindeutig, und eine
  *   Vergabe kennt keine Marke; `cycleThrough()` liest genauso.
@@ -91,7 +94,7 @@ final class AccessGraph
     }
 
     /**
-     * Die aktiven Zugaenge, deren Vergabe `$key` abdeckt, ohne `$key`.
+     * Die Zugaenge, deren Vergabe `$key` abdeckt, ohne `$key`; auch inaktive.
      *
      * @return list<string>
      */
@@ -141,7 +144,8 @@ final class AccessGraph
         $visit = function (string $node) use (&$visit, &$items, &$visited): void {
             $access = $this->accesses[$node] ?? null;
 
-            if ($access === null || ! $access->active || isset($visited[$node])) {
+            // `active` zaehlt hier nicht, siehe Klassenkommentar.
+            if ($access === null || isset($visited[$node])) {
                 return;
             }
 

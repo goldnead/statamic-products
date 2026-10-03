@@ -258,9 +258,11 @@ The same rules for the resolver and for `Accesses` below:
   levels down.
 - For a `course` the key is its entry id **and** the slug `statamic-courses` asks about (the entry's
   `product` field, else its slug).
-- **An inactive access passes nothing on.** It covers nothing, not even for whoever holds it
-  directly, and what it contains is not reached through it. Its own slug still counts as content of
-  the access around it, like a pointer to an access that has no record.
+- **`active` does not change what existing grants cover.** It only decides whether an access is
+  offered and granted anew (picker, new sales). A retired access resolves exactly like an active
+  one, held directly or nested, so buyers of a retired offer keep what they bought. To take access
+  away, revoke the grant in `statamic-entitlements` (`revoke()`); deactivating does not.
+- A pointer to an access without a record covers that slug and ends there.
 - Cycles end; every access is entered once.
 - Across all brands: slugs are unique over every brand and a grant carries none.
 - All accesses are read once per request (also per Octane request and queued job), and a save or
@@ -282,8 +284,8 @@ $access->contentsOf('course');    // contents of one kind, nested accesses inclu
 $access->model();                 // the Access model, to write or for its own contents only
 ```
 
-`find()` also returns inactive accesses, because replaying an old grant needs their credit lines;
-`expand()` and `contentsOf()` of an inactive access are empty. `expand()` is the exact inverse of
+`find()` also returns inactive accesses, and `expand()` and `contentsOf()` answer for them as for
+active ones, because existing grants stay valid. `expand()` is the exact inverse of
 the resolver: for each slug it lists, the resolver names this access.
 
 **Credits apply to the access granted directly, never through nesting.** `creditLines()` reads the
