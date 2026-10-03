@@ -156,6 +156,7 @@ return [
     'access_members_area' => 'Opens the members area',
     'access_members_area_help' => 'Whoever holds this access gets into the website\'s members area.',
     'access_active_help' => 'Marks an access as retired. Existing grants keep applying.',
+    'access_catalog_inactive' => ':name (inactive)',
     'access_contents_help' => 'What this access contains, in this order. For files the position is part of the download id, so reordering changes it.',
     'access_contents_empty' => 'No contents yet.',
     'access_content_add' => 'Add content',

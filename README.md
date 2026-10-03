@@ -252,6 +252,15 @@ One limit: entitlements' `EntitlementManager` is a singleton and keeps the resol
 was first resolved. If something resolves it before this addon's provider has registered (in an
 earlier provider's `register()`, say), it keeps the empty default and this resolver does not apply.
 
+With entitlements 1.6 or later the addon also announces every access by name to entitlements'
+product catalogue (the container tag `entitlements.product-catalog`). The grant form under
+Users > Entitlements, the limits form and the "Zugänge" section on a user page then offer a picker
+with names instead of a slug to type. Retired accesses are listed too, marked "(inaktiv)", because
+existing grants on them still apply. With a brand chosen only that brand's accesses are offered;
+with none chosen all of them, each with its brand name. Read
+when a form opens, so a new access is in the picker on the next page load. Older entitlements
+versions never ask, and nothing changes there.
+
 ### What a grant covers
 
 The same rules for the resolver and for `Accesses` below:

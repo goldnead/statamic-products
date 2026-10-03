@@ -156,6 +156,7 @@ return [
     'access_members_area' => 'Öffnet den Mitgliederbereich',
     'access_members_area_help' => 'Wer diesen Zugang hat, kommt in den Mitgliederbereich der Website.',
     'access_active_help' => 'Markiert einen Zugang als ausgelaufen. Bestehende Vergaben gelten weiter.',
+    'access_catalog_inactive' => ':name (inaktiv)',
     'access_contents_help' => 'Was dieser Zugang enthält, in dieser Reihenfolge. Bei Dateien gehört die Position zur Download-Kennung, umsortieren ändert sie.',
     'access_contents_empty' => 'Noch keine Inhalte.',
     'access_content_add' => 'Inhalt hinzufügen',
