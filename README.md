@@ -205,6 +205,23 @@ overwriting the newer state.
 Files and the cover are picked with core's own assets field and asset browser; the stored value is
 the asset id, `container::path`.
 
+**Which containers.** An access is sold, so a client's private files must not end up in one. The
+site names the containers an access may take files from:
+
+```php
+use Goldnead\StatamicProducts\Support\AccessContainers;
+
+AccessContainers::allow(['assets', 'downloads']);
+```
+
+Without that call every container is offered except the ones of `statamic-clientrooms` (its
+`statamic-clientrooms.container` handle and the per-brand `<handle>-<brandId>` variants). Other
+private containers are not recognised; a site that has some registers its list. The server refuses
+files and covers from any other container; a value already stored stays savable and is shown as
+gone with a note. With only one allowed container the container dropdown disappears.
+
+A granted access cannot be deleted, through the screen or through the model.
+
 **On the product**, "Opens" is a picker over the accesses of the current brand and still stores
 slugs, so payments and entitlements notice nothing. A slug without an access record stays valid and
 is listed below the picker as unresolved, not as an error. `ref` becomes optional when one of the

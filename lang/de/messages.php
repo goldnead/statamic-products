@@ -223,5 +223,6 @@ return [
     'credit_summary_named' => ':count × :type',
     'credit_summary_named_subscription' => ':count × :type je Monat',
     'asset_container' => 'Ablage',
+    'asset_container_not_allowed' => 'Diese Ablage ist für verkaufte Zugänge nicht freigegeben, etwa weil sie zu einem Klientenraum gehört.',
     'form_errors' => 'Speichern hat nicht geklappt. Die markierten Tabs und Felder zeigen, was fehlt.',
 ];

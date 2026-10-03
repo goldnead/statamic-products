@@ -136,6 +136,19 @@ function choicesFor(item) {
 
 const hasAssetPicker = computed(() => (props.context.assetPickers || []).length > 0);
 
+// Die Ablage der zuletzt gewaehlten Datei. Eine neue Dateizeile startet dort,
+// statt bei der ersten Ablage der Liste: wer zwoelf Dateien eines Kurses
+// anlegt, waehlt die Ablage einmal.
+function containerFromId(id) {
+    return typeof id === 'string' && id.includes('::') ? id.split('::')[0] : null;
+}
+
+const lastContainer = ref(
+    [...(props.form.contents || [])].reverse().map((item) => (item.kind === 'file' ? containerFromId(item.ref) : null)).find(Boolean)
+    || containerFromId(props.form.cover)
+    || null,
+);
+
 function usesAssetPicker(item) {
     return item.kind === 'file' && hasAssetPicker.value;
 }
@@ -198,8 +211,11 @@ function sessionState(credit) {
     return sessionLabels.value[credit.session_type] ? 'resolved' : 'missing';
 }
 
+// Leer, solange kein Typ gewaehlt ist: dann steht im Kopf nur „Neue Zeile".
 function creditTitle(credit) {
-    const type = sessionLabels.value[credit.session_type] || credit.session_type || '…';
+    if (!credit.session_type) return '';
+
+    const type = sessionLabels.value[credit.session_type] || credit.session_type;
     const subscription = credit.kind === 'subscription';
     const count = subscription ? credit.per_month : credit.count;
 
@@ -284,6 +300,8 @@ function error(key) {
                                     :model-value="form.cover || ''"
                                     :pickers="context.assetPickers"
                                     :container-label="t.asset_container"
+                                    :default-container="lastContainer"
+                                    @picked="lastContainer = $event"
                                     @update:model-value="form.cover = $event"
                                 />
                                 <Input v-else v-model="form.cover" class="font-mono text-xs" />
@@ -323,6 +341,8 @@ function error(key) {
                                                 :model-value="item.ref || ''"
                                                 :pickers="context.assetPickers"
                                                 :container-label="t.asset_container"
+                                                :default-container="lastContainer"
+                                                @picked="lastContainer = $event"
                                                 @update:model-value="item.ref = $event"
                                             />
                                             <Combobox
@@ -402,7 +422,7 @@ function error(key) {
                                     <!-- Kopf in Worten: was gutgeschrieben wird. Die Nummer
                                          zaehlt ab 1; intern bleibt `line`, wie sie ist. -->
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <Text variant="strong">{{ creditTitle(credit) }}</Text>
+                                        <Text v-if="creditTitle(credit)" variant="strong">{{ creditTitle(credit) }}</Text>
                                         <Badge
                                             pill
                                             color="default"
@@ -441,7 +461,10 @@ function error(key) {
                                                 @update:model-value="credit.session_type = $event || ''"
                                             />
                                             <Input v-else v-model="credit.session_type" class="font-mono text-xs" />
-                                            <div v-if="sessionState(credit)" class="mt-2">
+                                            <!-- Nur wenn etwas nicht stimmt: die Auswahl zeigt den
+                                                 Namen schon, ein gruenes „Gefunden" darunter
+                                                 waere Rauschen. -->
+                                            <div v-if="sessionState(credit) && sessionState(credit) !== 'resolved'" class="mt-2">
                                                 <Badge
                                                     pill
                                                     :color="badgeOf[sessionState(credit)].color"

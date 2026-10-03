@@ -223,5 +223,6 @@ return [
     'credit_summary_named' => ':count × :type',
     'credit_summary_named_subscription' => ':count × :type per month',
     'asset_container' => 'Container',
+    'asset_container_not_allowed' => 'This container is not cleared for accesses that are sold, for example because it belongs to a client room.',
     'form_errors' => 'Saving did not work. The marked tabs and fields show what is missing.',
 ];

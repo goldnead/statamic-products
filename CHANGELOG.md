@@ -28,7 +28,8 @@ stale tab is refused with 409 instead of overwriting the newer state.
 
 Session types come from the site through `SessionTypes::register($id, $label)`; the form then
 picks by name and refuses unknown ones. Files and the cover use core's assets field and asset
-browser.
+browser, limited to the containers the site allows through `AccessContainers::allow()`; without a
+registration client-room containers are left out. Files from other containers are refused.
 
 ### Changed: "Opens" on a product is a picker over the accesses
 

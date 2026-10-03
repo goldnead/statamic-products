@@ -7,6 +7,7 @@ use Goldnead\StatamicProducts\Http\Resources\Cp\AccessesCollection;
 use Goldnead\StatamicProducts\Http\Resources\Cp\ListedAccess;
 use Goldnead\StatamicProducts\Models\Access;
 use Goldnead\StatamicProducts\Models\Product;
+use Goldnead\StatamicProducts\Support\AccessContainers;
 use Goldnead\StatamicProducts\Support\ContentKinds;
 use Goldnead\StatamicProducts\Support\SessionTypes;
 use Goldnead\StatamicProducts\Support\Setup;
@@ -134,6 +135,11 @@ class AccessesController extends CpController
 
             $version = $request->input('version');
 
+            // Ohne Token wird bewusst nicht abgewiesen: ein Skript oder ein
+            // aelteres Formular kennt den Fingerabdruck nicht, und fuer beide
+            // gilt weiter „wer zuletzt speichert, gewinnt", wie vor dieser
+            // Pruefung. Das Formular dieses Addons schickt ihn immer mit.
+            // Belegt in AccessContainersTest (a_save_without_a_version_token…).
             if (is_string($version) && $version !== '' && ! hash_equals($fresh->version(), $version)) {
                 throw ValidationException::withMessages([
                     'version' => __('statamic-products::messages.access_stale'),
@@ -230,6 +236,7 @@ class AccessesController extends CpController
             }
 
             $this->checkCycle($validator, $request, $access);
+            $this->checkContainers($validator, $request, $access);
             $this->checkLines($validator, $request, $access, $granted);
         });
 
@@ -324,6 +331,40 @@ class AccessesController extends CpController
             $validator->errors()->add('contents', __('statamic-products::messages.access_cycle', [
                 'path' => implode(' → ', $cycle),
             ]));
+        }
+    }
+
+    /**
+     * Dateien und Titelbild nur aus erlaubten Ablagen.
+     *
+     * Was schon gespeichert ist, bleibt speicherbar, auch wenn die Ablage
+     * inzwischen nicht mehr erlaubt ist; der Bildschirm markiert es. Sonst
+     * blockierte eine geaenderte Anmeldung jede andere Aenderung am Zugang.
+     */
+    protected function checkContainers(Validator $validator, Request $request, ?Access $access): void
+    {
+        $stored = [(string) ($access->cover ?? '')];
+
+        foreach ($access?->contentItems() ?? [] as $item) {
+            if ($item['kind'] === ContentKinds::FILE) {
+                $stored[] = $item['ref'];
+            }
+        }
+
+        $refused = fn (string $id) => str_contains($id, '::')
+            && ! AccessContainers::allowsAsset($id)
+            && ! in_array($id, $stored, true);
+
+        $cover = trim((string) $request->input('cover', ''));
+
+        if ($cover !== '' && $refused($cover)) {
+            $validator->errors()->add('cover', __('statamic-products::messages.asset_container_not_allowed'));
+        }
+
+        foreach ((array) $request->input('contents', []) as $i => $item) {
+            if (is_array($item) && ($item['kind'] ?? null) === ContentKinds::FILE && $refused(trim((string) ($item['ref'] ?? '')))) {
+                $validator->errors()->add("contents.{$i}.ref", __('statamic-products::messages.asset_container_not_allowed'));
+            }
         }
     }
 
@@ -442,7 +483,10 @@ class AccessesController extends CpController
     protected function assetPickers(array $ids = []): array
     {
         try {
+            // Nur erlaubte Ablagen: ein Klientenraum gehoert nicht in einen
+            // verkaeuflichen Zugang ({@see AccessContainers}).
             return AssetContainer::all()
+                ->filter(fn ($container) => AccessContainers::allows((string) $container->handle()))
                 ->sortBy(fn ($container) => $container->title())
                 ->map(function ($container) use ($ids) {
                     $own = array_values(array_filter($ids, fn (string $id) => str_starts_with($id, $container->handle().'::')));
@@ -455,6 +499,10 @@ class AccessesController extends CpController
                             'mode' => 'list',
                             'display' => $container->title(),
                             'hide_display' => true,
+                            // Core's eigene Einstellung „Show Actions"; das
+                            // „…" (Vollbild und Co.) hat in einem Feld fuer
+                            // genau eine Datei nichts zu tun.
+                            'actions' => false,
                         ],
                     ]);
 

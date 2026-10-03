@@ -11,23 +11,32 @@
  * Der Wert ist die Asset-ID `container::pfad`, genau wie vorher im Textfeld.
  */
 import { computed, ref, useId, watch } from 'vue';
-import { Field, PublishContainer, PublishFields, PublishFieldsProvider, Select } from '@statamic/cms/ui';
+import { PublishContainer, PublishFields, PublishFieldsProvider, Select } from '@statamic/cms/ui';
 
 const props = defineProps({
     modelValue: { type: String, default: '' },
     // [{ handle, title, blueprint, meta }]
     pickers: { type: Array, required: true },
     containerLabel: { type: String, required: true },
+    // Ohne Wert: die Ablage der zuletzt gewaehlten Datei dieses Zugangs.
+    defaultContainer: { type: String, default: null },
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'picked']);
 
 const uid = useId();
+
+function known(handle) {
+    return props.pickers.some((picker) => picker.handle === handle);
+}
 
 function containerOf(value) {
     const handle = typeof value === 'string' && value.includes('::') ? value.split('::')[0] : null;
 
-    return props.pickers.some((picker) => picker.handle === handle) ? handle : props.pickers[0]?.handle;
+    if (known(handle)) return handle;
+    if (known(props.defaultContainer)) return props.defaultContainer;
+
+    return props.pickers[0]?.handle;
 }
 
 const container = ref(containerOf(props.modelValue));
@@ -59,15 +68,23 @@ const values = computed(() => ({
 function changed(next) {
     const id = Array.isArray(next?.asset) ? next.asset[0] : null;
 
+    if (id) emit('picked', container.value);
+
     emit('update:modelValue', id || '');
 }
 </script>
 
 <template>
     <div class="space-y-3">
-        <Field v-if="pickers.length > 1" :label="containerLabel">
-            <Select v-model="container" :options="containerOptions" />
-        </Field>
+        <!-- Ohne eigene Beschriftung: das Feld darueber heisst schon „Datei".
+             Bei nur einer erlaubten Ablage gibt es nichts zu waehlen. -->
+        <Select
+            v-if="pickers.length > 1"
+            v-model="container"
+            :options="containerOptions"
+            :aria-label="containerLabel"
+            :title="containerLabel"
+        />
 
         <PublishContainer
             v-if="picker"

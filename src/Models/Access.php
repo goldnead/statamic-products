@@ -86,6 +86,17 @@ class Access extends Model
         static::saving(function (self $access): void {
             $access->numberCreditLines();
         });
+
+        // Wie Kennung und Zeilen: ein vergebener Slug hat Datensaetze
+        // ausserhalb dieses Addons, die weiter gelten. Auch ein Import oder
+        // Tinker loescht ihn nicht.
+        static::deleting(function (self $access): void {
+            if ($access->hasBeenGranted()) {
+                throw ValidationException::withMessages([
+                    'handle' => __('statamic-products::messages.access_delete_refused'),
+                ]);
+            }
+        });
     }
 
     /**

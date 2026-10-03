@@ -5,6 +5,7 @@ namespace Goldnead\StatamicProducts\Tests;
 use Goldnead\StatamicPayments\Contracts\PaymentGateway;
 use Goldnead\StatamicPayments\Support\Catalogue;
 use Goldnead\StatamicProducts\ServiceProvider;
+use Goldnead\StatamicProducts\Support\AccessContainers;
 use Goldnead\StatamicProducts\Support\ContentKinds;
 use Goldnead\StatamicProducts\Support\RefTarget;
 use Goldnead\StatamicProducts\Support\SessionTypes;
@@ -63,6 +64,7 @@ abstract class TestCase extends AddonTestCase
         RefTarget::forget();
         ContentKinds::forget();
         SessionTypes::forget();
+        AccessContainers::forget();
 
         parent::tearDown();
     }

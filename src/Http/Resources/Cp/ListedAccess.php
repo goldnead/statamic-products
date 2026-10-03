@@ -3,6 +3,7 @@
 namespace Goldnead\StatamicProducts\Http\Resources\Cp;
 
 use Goldnead\StatamicProducts\Models\Access;
+use Goldnead\StatamicProducts\Support\AccessContainers;
 use Goldnead\StatamicProducts\Support\ContentKinds;
 use Goldnead\StatamicProducts\Support\RefTarget;
 use Goldnead\StatamicProducts\Support\SessionTypes;
@@ -79,9 +80,15 @@ class ListedAccess extends JsonResource
         foreach ($access->contentItems() as $item) {
             $target = RefTarget::forContent($item['kind'], $item['ref']);
 
+            // Eine gespeicherte Datei aus einer Ablage, die nicht (mehr) erlaubt
+            // ist: bleibt speicherbar, aber der Bildschirm sagt es deutlich.
+            $outside = $item['kind'] === ContentKinds::FILE
+                && str_contains($item['ref'], '::')
+                && ! AccessContainers::allowsAsset($item['ref']);
+
             $targets[$item['kind'].'|'.$item['ref']] = [
-                'state' => $target->state,
-                'label' => $target->label,
+                'state' => $outside ? RefTarget::MISSING : $target->state,
+                'label' => $outside ? __('statamic-products::messages.asset_container_not_allowed') : $target->label,
                 'kind_label' => ContentKinds::label($item['kind']),
             ];
         }

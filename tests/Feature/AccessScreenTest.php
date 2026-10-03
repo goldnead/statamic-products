@@ -9,6 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
+use Statamic\Facades\AssetContainer;
 use Statamic\Facades\Role;
 use Statamic\Facades\User;
 
@@ -92,6 +93,8 @@ class AccessScreenTest extends TestCase
     public function an_access_with_every_kind_of_content_and_two_credit_lines_can_be_created(): void
     {
         ContentKinds::register('community', 'Community');
+        // Dateien nur aus einer Ablage, die es gibt (AccessContainersTest).
+        AssetContainer::make('assets')->disk('local')->save();
 
         $this->actingAs($this->user())
             ->postJson($this->url(), $this->valid([
