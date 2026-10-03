@@ -3,9 +3,9 @@
 namespace Goldnead\StatamicProducts\Http\Controllers\Cp;
 
 use Goldnead\StatamicPayments\Support\Catalogue;
+use Goldnead\StatamicProducts\Http\Resources\Cp\ListedProduct;
 use Goldnead\StatamicProducts\Http\Resources\Cp\ProductsCollection;
 use Goldnead\StatamicProducts\Models\Product;
-use Goldnead\StatamicProducts\Support\CpNumber;
 use Goldnead\StatamicProducts\Support\ProductContext;
 use Goldnead\StatamicProducts\Support\RefTarget;
 use Goldnead\StatamicProducts\Support\Setup;
@@ -55,7 +55,7 @@ class ProductsController extends CpController
 
         return Inertia::render('statamic-products::Products/Index', [
             'listingUrl' => cp_route('utilities.products'),
-            'storeUrl' => cp_route('utilities.products.store'),
+            'createUrl' => cp_route('utilities.products.create'),
             'sortColumn' => 'name',
             'sortDirection' => 'asc',
             // Scoped like the listing itself. Unscoped, a brand with no
@@ -63,21 +63,6 @@ class ProductsController extends CpController
             // of the empty state that explains what a product is and offers to
             // make one — because somebody else's catalogue exists.
             'hasAny' => Product::query()->forBrand()->exists(),
-            'currency' => (string) config('statamic-payments.currency', 'EUR'),
-            // The handles the config file already claims. Handed to the form so
-            // the collision is visible *while typing a handle*, rather than
-            // after a purchase went through at the other price.
-            'configuredHandles' => array_keys(app(Catalogue::class)->configured()),
-            // What a product can be, with the label and the one line that says
-            // what its pointer is expected to hold. Built here so the form has
-            // no vocabulary of its own to drift from the model's.
-            'types' => collect(Product::types())->map(fn (string $type) => [
-                'value' => $type,
-                'label' => __('statamic-products::messages.type_'.$type),
-                'description' => __('statamic-products::messages.type_'.$type.'_description'),
-                'ref_label' => __('statamic-products::messages.ref_'.$type),
-                'needs_ref' => in_array($type, Product::typesNeedingRef(), true),
-            ])->all(),
             // **Eine Zahl, die sich nicht abschalten laesst.**
             //
             // Das Abzeichen an der Zeile sagt *welches* Produkt ins Leere
@@ -100,15 +85,62 @@ class ProductsController extends CpController
     }
 
     /**
-     * One product, and what the rest of the family knows about it.
+     * The empty form. There is no record yet for a detail page to stand on, so
+     * creating is a page of its own, like "Create Entry" in core; everything
+     * after the first save happens on the detail page.
+     */
+    public function create()
+    {
+        $this->authorizeAccess();
+
+        if ($setup = Setup::guard(__('statamic-products::messages.utility_nav'), 'products')) {
+            return $setup;
+        }
+
+        return Inertia::render('statamic-products::Products/Create', [
+            'storeUrl' => cp_route('utilities.products.store'),
+            'indexUrl' => cp_route('utilities.products'),
+            'form' => $this->formContext(),
+            't' => $this->strings(),
+        ]);
+    }
+
+    /**
+     * What the form needs besides the record: vocabulary the server owns, so the
+     * screen has none of its own to drift from the model's.
      *
-     * The row itself is edited in the stack on the listing; this screen is the
-     * way *back* from a product: the offers that sell it and the people who
-     * bought it. Either section is present only when the sibling that owns
-     * the data is installed and migrated — `null` here is "cannot know", an
+     * @return array<string, mixed>
+     */
+    protected function formContext(): array
+    {
+        return [
+            'currency' => (string) config('statamic-payments.currency', 'EUR'),
+            // The handles the config file already claims. Handed to the form so
+            // the collision is visible *while typing a handle*, rather than
+            // after a purchase went through at the other price.
+            'configuredHandles' => array_keys(app(Catalogue::class)->configured()),
+            // What a product can be, with the label and the one line that says
+            // what its pointer is expected to hold.
+            'types' => collect(Product::types())->map(fn (string $type) => [
+                'value' => $type,
+                'label' => __('statamic-products::messages.type_'.$type),
+                'description' => __('statamic-products::messages.type_'.$type.'_description'),
+                'ref_label' => __('statamic-products::messages.ref_'.$type),
+                'needs_ref' => in_array($type, Product::typesNeedingRef(), true),
+            ])->all(),
+        ];
+    }
+
+    /**
+     * One product: its form, and what the rest of the family knows about it.
+     *
+     * The detail page *is* the form, the way a collection entry's is. Below it
+     * sit the offers that sell the product and the people who bought it. Either
+     * section is present only when the sibling that owns the data is installed
+     * and migrated — `null` here is "cannot know", an
      * empty list is "nobody", and the screen shows them differently.
      */
-    public function show(int $product)
+    public function show(Request $request, int $product)
     {
         $this->authorizeAccess();
 
@@ -119,28 +151,22 @@ class ProductsController extends CpController
         // away.
         $product = Product::query()->forBrand()->findOrFail($product);
 
+        // The row as the listing serves it: the form's values, plus the two
+        // warnings that belong on top of it (pointer gone, config wins).
+        $row = (new ListedProduct($product))->toArray($request);
+
         return Inertia::render('statamic-products::Products/Show', [
             'product' => [
                 'id' => $product->id,
                 'name' => $product->name,
-                'handle' => $product->handle,
-                'type_label' => __('statamic-products::messages.type_'.$product->type),
-                'amount' => CpNumber::decimal($product->amount_cent / 100, 2),
-                'currency' => $product->currency(),
-
-                // Der Zahlungsrhythmus, so wie er in der Spalte steht. `null`
-                // heisst einmalig — das Formular zeigt dann ein leeres Feld,
-                // und genau das ist die richtige Anzeige fuer „kein Plan".
-                'interval' => $product->interval,
-                'times' => $product->times,
-                'trial_days' => $product->trial_days,
-                'trial_amount_cent' => $product->trial_amount_cent,
-
-                'digital' => (bool) $product->digital,
-                'grants' => $product->grantSlugs(),
-                'active' => (bool) $product->active,
+                'values' => $row['edit_values'],
+                'ref_missing' => $row['ref_missing'],
+                'shadowed' => $row['shadowed'],
                 'sold' => $product->hasBeenSold(),
             ],
+            'form' => $this->formContext(),
+            'updateUrl' => cp_route('utilities.products.update', $product->id),
+            'deleteUrl' => cp_route('utilities.products.destroy', $product->id),
             'offers' => ProductContext::offers($product),
             'buyers' => ProductContext::buyers($product),
             'buyersLimit' => ProductContext::BUYERS_LIMIT,
@@ -155,7 +181,10 @@ class ProductsController extends CpController
 
         $product = Product::create($this->validated($request));
 
-        return back()->with('message', __('statamic-products::messages.saved', ['name' => $product->name]));
+        // To the new product's own page, not back: "back" is the empty create
+        // form, and the next thing anyone does is look at what they made.
+        return redirect(cp_route('utilities.products.show', $product->id))
+            ->with('message', __('statamic-products::messages.saved', ['name' => $product->name]));
     }
 
     public function update(Request $request, Product $product)
@@ -185,7 +214,9 @@ class ProductsController extends CpController
 
         $product->delete();
 
-        return back()->with('message', __('statamic-products::messages.deleted'));
+        // Not back: back is the detail page of a row that no longer exists.
+        return redirect(cp_route('utilities.products'))
+            ->with('message', __('statamic-products::messages.deleted'));
     }
 
     /**
@@ -447,7 +478,13 @@ class ProductsController extends CpController
             'empty_title' => __('statamic-products::messages.empty_title'),
             'empty_description' => __('statamic-products::messages.empty_description'),
             'new' => __('statamic-products::messages.new_product'),
+            'create_title' => __('statamic-products::messages.create_product'),
             'edit' => __('statamic-products::messages.edit_product'),
+            'section_basics' => __('statamic-products::messages.section_basics'),
+            'section_price' => __('statamic-products::messages.section_price'),
+            'section_supply' => __('statamic-products::messages.section_supply'),
+            'section_visibility' => __('statamic-products::messages.section_visibility'),
+            'field_active_help' => __('statamic-products::messages.field_active_help'),
             'delete_title' => __('statamic-products::messages.delete_title'),
             'delete_body' => __('statamic-products::messages.delete_body', ['name' => ':name']),
             'delete_refused_sold' => __('statamic-products::messages.delete_refused_sold'),

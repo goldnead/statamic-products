@@ -4,11 +4,13 @@
  */
 
 import ProductsIndex from './pages/Products/Index.vue';
+import ProductsCreate from './pages/Products/Create.vue';
 import ProductsShow from './pages/Products/Show.vue';
 import SetupRequired from './pages/SetupRequired.vue';
 
 Statamic.booting(() => {
     Statamic.$inertia.register('statamic-products::Products/Index', ProductsIndex);
+    Statamic.$inertia.register('statamic-products::Products/Create', ProductsCreate);
     Statamic.$inertia.register('statamic-products::Products/Show', ProductsShow);
     Statamic.$inertia.register('statamic-products::SetupRequired', SetupRequired);
 });

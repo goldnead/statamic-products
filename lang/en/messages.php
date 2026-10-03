@@ -15,7 +15,7 @@ return [
     'column_handle' => 'Handle',
     'column_amount' => 'List price',
     'column_digital' => 'Supply',
-    'column_grants' => 'Opens',
+    'column_grants' => 'Unlocks (accesses)',
     'column_active' => 'Active',
 
     'new_product' => 'New product',
@@ -51,8 +51,8 @@ return [
     'digital_yes' => 'Electronically supplied',
     'digital_no' => 'In person or on paper',
 
-    'field_grants' => 'Opens',
-    'field_grants_help' => 'What a paid copy opens. More than one is fine; empty means nothing.',
+    'field_grants' => 'Unlocks (accesses)',
+    'field_grants_help' => 'The accesses a paid copy opens. Only the name is stored here; what an access contains is decided by the website. More than one is fine; empty means nothing.',
     'field_grants_placeholder' => 'Add access',
 
     'column_type' => 'Kind',
@@ -96,6 +96,12 @@ return [
 
     'show_action' => 'Offers and buyers',
     'back_to_list' => 'All products',
+    'create_product' => 'Create product',
+    'section_basics' => 'Basics',
+    'section_price' => 'Price and payment',
+    'section_supply' => 'Delivery and accesses',
+    'section_visibility' => 'Visibility',
+    'field_active_help' => 'An inactive product is missing from the catalogue and cannot be sold. What was already bought stays readable.',
     'facts_heading' => 'Product',
     'section_offers' => 'Offers',
     'section_offers_hint' => 'Every offer that sells this product, as its lead product or in a bundle.',
