@@ -31,12 +31,20 @@ jobs:
         # matches what composer.json actually promises.
         laravel: ['^12.0', '^13.0']
         stability: [prefer-lowest, prefer-stable]
+        # `latest` = whatever ^1.4 resolves to. The extra row pins the version
+        # adriangoldner.com runs, on current everything else.
+        entitlements: [latest]
         exclude:
           # Laravel 13 requires PHP ^8.3.
           - php: '8.2'
             laravel: '^13.0'
+        include:
+          - php: '8.3'
+            laravel: '^13.0'
+            stability: prefer-stable
+            entitlements: '1.4.0'
 
-    name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }} · ${{ matrix.stability }}
+    name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }} · ${{ matrix.stability }} · entitlements ${{ matrix.entitlements }}
 
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +59,9 @@ jobs:
       - name: Install dependencies
         run: |
           composer require "laravel/framework:${{ matrix.laravel }}" --no-interaction --no-update
+          if [ "${{ matrix.entitlements }}" != "latest" ]; then
+            composer require --dev "goldnead/statamic-entitlements:${{ matrix.entitlements }}" --no-interaction --no-update
+          fi
           composer update --${{ matrix.stability }} --prefer-dist --no-interaction
 
       - name: Run tests
