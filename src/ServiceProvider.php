@@ -2,12 +2,16 @@
 
 namespace Goldnead\StatamicProducts;
 
+use Goldnead\Entitlements\Contracts\PackageResolver;
+use Goldnead\Entitlements\Support\NullPackageResolver;
 use Goldnead\StatamicPayments\Cp\SuiteNav;
 use Goldnead\StatamicPayments\Support\Brands;
 use Goldnead\StatamicPayments\Support\Catalogue;
 use Goldnead\StatamicProducts\Http\Controllers\Cp\AccessesController;
 use Goldnead\StatamicProducts\Http\Controllers\Cp\ProductsController;
 use Goldnead\StatamicProducts\Models\Product;
+use Goldnead\StatamicProducts\Support\AccessGraph;
+use Goldnead\StatamicProducts\Support\AccessPackageResolver;
 use Illuminate\Support\Facades\Log;
 use Statamic\Facades\CP\Nav;
 use Statamic\Facades\Utility;
@@ -42,7 +46,35 @@ class ServiceProvider extends AddonServiceProvider
         // resolves to nothing and simply cannot be bought — a failure that
         // looks like a missing product rather than a missing registration.
         // `statamic-offers` learned this the same way.
-        $this->bootCatalogue();
+        $this->bootCatalogue()
+            ->bindPackageResolver();
+    }
+
+    /**
+     * Zugaenge fuer `Accesses` und statamic-entitlements.
+     *
+     * Der Graph ist `scoped`: einmal je Request gelesen, und Octane wie
+     * Queue-Worker werfen ihn zwischen zwei Requests oder Jobs weg.
+     *
+     * Der Resolver wird **nur anstelle von entitlements' `NullPackageResolver`**
+     * eingesetzt, ueber `extend()` und nicht ueber `bind()`. So gewinnt ein
+     * Resolver, den die Website bindet, gleich in welcher Reihenfolge die
+     * Provider laufen (adriangoldner.com bindet heute `CatalogPackageResolver`).
+     * Ohne entitlements gibt es das Interface nicht, und es passiert nichts.
+     */
+    protected function bindPackageResolver(): self
+    {
+        $this->app->scoped(AccessGraph::class);
+
+        if (! interface_exists(PackageResolver::class)) {
+            return $this;
+        }
+
+        $this->app->extend(PackageResolver::class, fn (object $resolver, $app) => $resolver instanceof NullPackageResolver
+            ? $app->make(AccessPackageResolver::class)
+            : $resolver);
+
+        return $this;
     }
 
     public function bootAddon()

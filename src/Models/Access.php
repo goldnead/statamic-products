@@ -3,6 +3,7 @@
 namespace Goldnead\StatamicProducts\Models;
 
 use Goldnead\StatamicPayments\Support\Brands;
+use Goldnead\StatamicProducts\Support\AccessGraph;
 use Goldnead\StatamicProducts\Support\ContentKinds;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -97,6 +98,12 @@ class Access extends Model
                 ]);
             }
         });
+
+        // Die Lese-API und der PackageResolver merken sich alle Zugaenge fuer
+        // den Request. Wer im selben Request speichert, liest danach den neuen
+        // Stand, nicht den gemerkten.
+        static::saved(fn () => AccessGraph::forget());
+        static::deleted(fn () => AccessGraph::forget());
     }
 
     /**
