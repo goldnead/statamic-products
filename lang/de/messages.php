@@ -189,7 +189,7 @@ return [
     'credit_locked_hint' => 'Schon vergeben: eine Zeile lässt sich beenden, nicht löschen.',
     'credit_line_unknown' => 'Diese Zeilennummer gibt es an diesem Zugang nicht. Nummern vergibt der Server.',
     'credit_line_not_deletable' => '{1} Zeile :lines wurde schon vergeben und kann nicht gelöscht werden. Beende sie stattdessen.|[2,*] Die Zeilen :lines wurden schon vergeben und können nicht gelöscht werden. Beende sie stattdessen.',
-    'credit_summary_one_time' => ':count Sitzungen',
+    'credit_summary_one_time' => '{1} :count Sitzung|[2,*] :count Sitzungen',
     'credit_summary_subscription' => ':count je Monat',
     'access_cycle' => 'Ein Zugang darf sich nicht selbst enthalten, auch nicht über Umwege: :path.',
     'access_products_hint' => 'Jedes Produkt, das diesen Zugang freischaltet.',

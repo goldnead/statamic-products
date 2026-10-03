@@ -189,7 +189,7 @@ return [
     'credit_locked_hint' => 'Already granted: a line can be ended, not deleted.',
     'credit_line_unknown' => 'This access has no line with that number. Numbers are assigned by the server.',
     'credit_line_not_deletable' => '{1} Line :lines has already been granted and cannot be deleted. End it instead.|[2,*] Lines :lines have already been granted and cannot be deleted. End them instead.',
-    'credit_summary_one_time' => ':count sessions',
+    'credit_summary_one_time' => '{1} :count session|[2,*] :count sessions',
     'credit_summary_subscription' => ':count per month',
     'access_cycle' => 'An access may not contain itself, not even indirectly: :path.',
     'access_products_hint' => 'Every product that opens this access.',

@@ -31,7 +31,7 @@ class ListedAccess extends JsonResource
             'credits_summary' => implode(' · ', array_map(
                 fn (array $line) => ($line['kind'] === Access::CREDIT_SUBSCRIPTION
                     ? __('statamic-products::messages.credit_summary_subscription', ['count' => $line['per_month']])
-                    : __('statamic-products::messages.credit_summary_one_time', ['count' => $line['count']])),
+                    : trans_choice('statamic-products::messages.credit_summary_one_time', (int) $line['count'], ['count' => $line['count']])),
                 array_values(array_filter($lines, fn (array $line) => ($line['ended_at'] ?? null) === null)),
             )),
             'members' => $this->opens_members_area,

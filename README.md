@@ -7,9 +7,10 @@ The thing that is sold, with a name, a list price, and the access it grants.
 itself existed nowhere, so every site invented it again — and on one of them it got invented twice,
 as `member_packages` and `access_packages`, and the two drifted.
 
-This addon is that missing middle and nothing more. It does not deliver anything. What a course
-*shows* stays the website's business; this says that a course exists, what it costs, and what it
-opens.
+This addon is that missing middle and nothing more. **It keeps, it does not deliver.** It keeps what
+a purchase opens (which courses, files, dates, session credits and whether the members area opens)
+as an access record; what a course *shows*, which file is streamed and which credit is written stays
+with the sibling addons and the website, which read it from here.
 
 ## Installation
 
@@ -148,14 +149,58 @@ row and a warning in the form. Two truths about one price is the illness that ha
 Nothing has to be migrated. A site whose prices live in a file can install this addon and never
 notice it.
 
+## Accesses
+
+A product grants slugs (`grants`). An **access** is the record behind one slug: same handle, and it
+keeps what that slug contains. **Utilities → Accesses** (own permission,
+`access product-accesses utility`), with a list and a detail page built like the product's.
+
+| Field | Meaning |
+| --- | --- |
+| `handle` | The grant slug. Unique across every brand, **frozen once a grant in `statamic-entitlements` carries it** (checked only when the `entitlements` table exists). A granted access cannot be deleted either. |
+| `name`, `description`, `cover` | What the buyer's account shows. `cover` is an asset (`container::path`) or a URL. |
+| `active`, `brand_id` | As on a product. |
+| `opens_members_area` | Whoever holds it gets into the site's members area. |
+| `contents` | Ordered list of `{kind, ref, label}`. For files the position is part of the download id. |
+| `credits` | Credit lines `{line, session_type, kind: one_time\|subscription, count, per_month, valid_months, ended_at}`. |
+
+**Content kinds:** `access` (another access, nested; a cycle is refused), `course` (an entry id of
+the `statamic-courses` course collection), `file` (an asset, `container::path`), `event` (a uuid in
+`statamic-events`). A site adds its own kinds:
+
+```php
+use Goldnead\StatamicProducts\Support\ContentKinds;
+
+ContentKinds::register('community', 'Community-Bereich', 'Space (Kennung)');
+```
+
+Every pointer shows the same three states as a product's `ref`: found, gone, cannot be checked. A
+site's own kinds are always "cannot be checked"; only the site knows what they point at.
+
+**Credit lines:** `line` is assigned by the model, starts at 0 and is **never handed out twice**,
+not even after a line was deleted (`credit_lines_issued` counts). It is the `<index>` in the
+site's idempotency key, so reusing one would make a later credit look like it already happened. An
+import may bring its own `line`; the counter then moves past the highest. Once the access has been
+granted a line can be **ended** (`ended_at`), not deleted. `session_type` is free text for now (the
+site's id or uuid); a registry for it is the next step.
+
+**On the product**, "Opens" is a picker over the accesses of the current brand and still stores
+slugs, so payments and entitlements notice nothing. A slug without an access record stays valid and
+is listed below the picker as unresolved, not as an error. `ref` becomes optional when one of the
+granted slugs is an access, because the access then keeps the contents.
+
+Credits apply to the access granted directly, never through nesting. Reading accesses (a lookup
+API and a transitive `PackageResolver` for `statamic-entitlements`) is not part of this release.
+
 ## What it will not do
 
 - **No course player, no community engine, no members area.** The addon says a product *is* a
   course. What a course shows stays the website's business. Otherwise an addon becomes a platform.
 - **No calendar and no booking.** `statamic-events` and cal.com solve that. A product may point at
   them; it does not rebuild them.
-- **No product content.** Lessons, videos and files are Statamic content and belong in collections.
-  A product is the ticket, not the show.
+- **No product content.** Lessons, videos and files are Statamic content and belong in collections
+  and asset containers. An access *lists* them; it does not hold or serve them. A product is the
+  ticket, not the show.
 
 ## Requirements
 

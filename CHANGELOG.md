@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Added: accesses, the record behind a grant slug
+
+New table `product_accesses` (run `php artisan migrate`), model `Access`, and a Control Panel
+screen **Accesses** with its own permission (`access product-accesses utility`), a list and a
+detail page with tabs and a sidebar like the product's. An access keeps what a slug opens: ordered
+contents (`access`, `course`, `file`, `event`, plus kinds a site registers through
+`ContentKinds::register()`), credit lines for sessions, and whether it opens the members area.
+
+The rules that protect data outside this addon:
+
+- a nested access may not lead back to itself;
+- the handle freezes once a grant in `statamic-entitlements` carries it, and such an access
+  cannot be deleted;
+- a credit line's `line` is assigned by the model and never reused, and after a grant a line can
+  be ended but not deleted.
+
+Pointers show found, gone or cannot be checked, like a product's `ref`
+(`RefTarget::forContent()`).
+
+### Changed: "Opens" on a product is a picker over the accesses
+
+Still stores slugs; payments and entitlements see no difference. Slugs without an access record
+stay valid and are listed as unresolved. `ref` is optional when a granted slug is an access.
+
 ## 1.6.2 — 2026-09-22
 
 ### Fixed: the product title in the listing centered instead of aligning left
