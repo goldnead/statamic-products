@@ -2,10 +2,12 @@
 
 namespace Goldnead\StatamicProducts\Support;
 
+use Goldnead\StatamicProducts\Models\Access;
 use Goldnead\StatamicProducts\Models\Product;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Statamic\Entries\Entry as CoreEntry;
+use Statamic\Facades\Asset as AssetFacade;
 use Statamic\Facades\Collection as CollectionFacade;
 use Statamic\Facades\Entry as EntryFacade;
 use Throwable;
@@ -152,6 +154,95 @@ final class RefTarget
         }
 
         return self::$memo[$key] = $target;
+    }
+
+    /**
+     * Look up one item of an access's contents.
+     *
+     * Same three answers as for a product's `ref`, and the same promise: never
+     * throws. The kinds a site registers itself (`community` on
+     * adriangoldner.com) are always unknowable here, because only the site knows
+     * what their pointer names.
+     */
+    public static function forContent(string $kind, string $ref): self
+    {
+        $ref = trim($ref);
+
+        if ($ref === '') {
+            return new self(self::MISSING);
+        }
+
+        $key = 'content:'.$kind.'|'.$ref;
+
+        if (isset(self::$memo[$key])) {
+            return self::$memo[$key];
+        }
+
+        try {
+            $target = match ($kind) {
+                ContentKinds::ACCESS => self::access($ref),
+                ContentKinds::COURSE => self::course($ref),
+                ContentKinds::FILE => self::asset($ref),
+                ContentKinds::EVENT => self::event($ref),
+                default => new self(self::UNKNOWABLE),
+            };
+        } catch (Throwable) {
+            return new self(self::UNKNOWABLE);
+        }
+
+        return self::$memo[$key] = $target;
+    }
+
+    /** Another access, by its slug. Ours, so always checkable. */
+    private static function access(string $ref): self
+    {
+        $name = Access::query()->where('handle', $ref)->value('name');
+
+        return $name === null
+            ? new self(self::MISSING)
+            : new self(self::RESOLVED, (string) $name);
+    }
+
+    /**
+     * A course in `statamic-courses`: an entry of its course collection, by id.
+     *
+     * By id and not by slug, because a slug may be edited and an id may not.
+     * Unknowable while that package is not installed: the entry may exist, but
+     * nothing here can say it is a course.
+     */
+    private static function course(string $ref): self
+    {
+        if (! class_exists('\Goldnead\Courses\ServiceProvider')) {
+            return new self(self::UNKNOWABLE);
+        }
+
+        $entry = EntryFacade::find($ref);
+        $collection = (string) config('courses.collections.courses', 'courses');
+
+        if ($entry === null || ! $entry instanceof CoreEntry || $entry->collectionHandle() !== $collection) {
+            return new self(self::MISSING);
+        }
+
+        return new self(self::RESOLVED, (string) ($entry->get('title') ?: $entry->slug() ?: $ref));
+    }
+
+    /**
+     * A Statamic asset, as `container::path`.
+     *
+     * Asset containers are core, so this is always checkable. A reference
+     * without a container is not a reference to anything.
+     */
+    private static function asset(string $ref): self
+    {
+        if (! str_contains($ref, '::')) {
+            return new self(self::MISSING);
+        }
+
+        $asset = AssetFacade::find($ref);
+
+        return $asset === null
+            ? new self(self::MISSING)
+            : new self(self::RESOLVED, (string) $asset->basename());
     }
 
     /**

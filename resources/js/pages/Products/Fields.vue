@@ -80,9 +80,26 @@ const refMissing = computed(() => Boolean(props.product?.ref_missing) && props.f
 
 const handleFrozen = computed(() => Boolean(props.product?.sold));
 
-// A taggable combobox with an empty option list shows "1 selected" and "no
-// options available" at once. The list is what has been typed so far.
-const grantOptions = computed(() => (props.form.grants || []).map((slug) => ({ value: slug, label: slug })));
+// Die Zugaenge dieser Marke, dazu jeder Slug, der schon am Produkt steht und
+// keinen Zugang hat (Bestand). Ohne die zweite Haelfte zeigte der Picker einen
+// gespeicherten Slug als leere Pille. Gespeichert wird in beiden Faellen der Slug.
+const accessOptions = computed(() => (props.context.accesses || []).map((access) => ({
+    value: access.value,
+    label: `${access.label} (${access.value})`,
+})));
+
+const knownSlugs = computed(() => new Set((props.context.accesses || []).map((access) => access.value)));
+
+const unresolvedGrants = computed(() => (props.form.grants || []).filter((slug) => !knownSlugs.value.has(slug)));
+
+// Fuehrt ein freigeschalteter Zugang die Inhalte, ist der Verweis optional; der
+// Server prueft dasselbe.
+const grantsAnAccess = computed(() => (props.form.grants || []).some((slug) => knownSlugs.value.has(slug)));
+
+const grantOptions = computed(() => [
+    ...accessOptions.value,
+    ...unresolvedGrants.value.map((slug) => ({ value: slug, label: slug })),
+]);
 
 function numberOrNull(key, value) {
     props.form[key] = value === '' || value === null ? null : Number(value);
@@ -131,7 +148,7 @@ function numberOrNull(key, value) {
                                     :label="chosenType.ref_label"
                                     :instructions="t.field_ref_help"
                                     :error="errors.ref"
-                                    required
+                                    :required="!grantsAnAccess"
                                 >
                                     <Input v-model="form.ref" class="font-mono text-xs" />
                                 </Field>
@@ -224,10 +241,10 @@ function numberOrNull(key, value) {
                                 </Field>
 
                                 <Field :label="t.field_grants" :instructions="t.field_grants_help" :error="errors.grants">
-                                    <!-- `taggable`: ein Zugangsname ist ein Name, den die
-                                         Website erfindet, keine Liste, die dieses Addon
-                                         anbieten koennte. `searchable` ist daneben Pflicht:
-                                         das Tag wird ins Suchfeld getippt. -->
+                                    <!-- Ein Picker ueber die Zugaenge. `taggable` bleibt:
+                                         bis zur Uebernahme fuehrt die Website manche Zugaenge
+                                         noch selbst, und deren Slug muss sich weiter
+                                         eintippen lassen. `searchable` ist daneben Pflicht. -->
                                     <Combobox
                                         v-model="form.grants"
                                         :options="grantOptions"
@@ -237,6 +254,11 @@ function numberOrNull(key, value) {
                                         taggable
                                         clearable
                                     />
+                                    <!-- Kein Fehler, nur eine Auskunft: vergeben wird der
+                                         Slug trotzdem. -->
+                                    <p v-if="unresolvedGrants.length" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                        {{ t.grants_unresolved.replace(':slugs', unresolvedGrants.join(', ')) }}
+                                    </p>
                                 </Field>
                         </div>
                     </CardPanel>

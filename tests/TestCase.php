@@ -5,7 +5,10 @@ namespace Goldnead\StatamicProducts\Tests;
 use Goldnead\StatamicPayments\Contracts\PaymentGateway;
 use Goldnead\StatamicPayments\Support\Catalogue;
 use Goldnead\StatamicProducts\ServiceProvider;
+use Goldnead\StatamicProducts\Support\AccessContainers;
+use Goldnead\StatamicProducts\Support\ContentKinds;
 use Goldnead\StatamicProducts\Support\RefTarget;
+use Goldnead\StatamicProducts\Support\SessionTypes;
 use Goldnead\StatamicProducts\Support\SoldHandles;
 use Goldnead\StatamicProducts\Tests\Support\FakeGateway;
 use Statamic\Testing\AddonTestCase;
@@ -59,6 +62,9 @@ abstract class TestCase extends AddonTestCase
         Catalogue::forgetResolvers();
         SoldHandles::forget();
         RefTarget::forget();
+        ContentKinds::forget();
+        SessionTypes::forget();
+        AccessContainers::forget();
 
         parent::tearDown();
     }
