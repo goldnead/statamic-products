@@ -61,6 +61,11 @@ class ServiceProvider extends AddonServiceProvider
      * Resolver, den die Website bindet, gleich in welcher Reihenfolge die
      * Provider laufen (adriangoldner.com bindet heute `CatalogPackageResolver`).
      * Ohne entitlements gibt es das Interface nicht, und es passiert nichts.
+     *
+     * Grenze: der `EntitlementManager` ist ein Singleton und haelt den Resolver,
+     * den er beim ersten Aufloesen bekommt. Loest ihn jemand auf, bevor dieser
+     * Provider registriert ist (etwa im register() eines frueheren Providers),
+     * behaelt er den `NullPackageResolver`, und dieser Resolver greift nicht.
      */
     protected function bindPackageResolver(): self
     {

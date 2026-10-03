@@ -24,6 +24,16 @@ final class Accesses
      * Auch inaktive: `active` sagt nur, ob er neu vergeben wird. Bestehende
      * Vergaben gelten weiter, also liefern `expand()` und `contentsOf()` auch
      * bei einem ausgemusterten Zugang seinen Inhalt.
+     *
+     * Das Ergebnis ist ein Schnappschuss: nach einem Speichern `find()` neu
+     * aufrufen, ein gehaltenes Objekt sieht die Aenderung nicht. Gelesen wird
+     * einmal je Request; ein langlebiger Konsolenprozess (eigener Daemon,
+     * Schleife in einem Command) sieht, was andere Prozesse schreiben, erst
+     * nach `AccessGraph::forget()`. Queue-Worker und Octane verwerfen ihn
+     * zwischen Jobs und Requests selbst.
+     *
+     * Vor `php artisan migrate` wirft `find()` (fehlende Tabelle); nur der
+     * PackageResolver faengt das ab und antwortet „keine Buendel".
      */
     public static function find(string $slug): ?AccessView
     {

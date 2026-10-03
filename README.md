@@ -248,6 +248,10 @@ order the providers run in; the addon only replaces `NullPackageResolver`. To ke
 entirely, bind a resolver that returns `[]`. Without entitlements the addon binds nothing and works
 as before.
 
+One limit: entitlements' `EntitlementManager` is a singleton and keeps the resolver it got when it
+was first resolved. If something resolves it before this addon's provider has registered (in an
+earlier provider's `register()`, say), it keeps the empty default and this resolver does not apply.
+
 ### What a grant covers
 
 The same rules for the resolver and for `Accesses` below:
@@ -268,7 +272,7 @@ The same rules for the resolver and for `Accesses` below:
 - All accesses are read once per request (also per Octane request and queued job), and a save or
   delete of an access is visible to the next read in the same request. If the table cannot be read
   (before `php artisan migrate`) the resolver answers "no bundles" and logs an error instead of
-  failing the page.
+  failing the page. That fallback is the resolver's only: `Accesses::find()` throws.
 
 ### Reading accesses
 
@@ -287,6 +291,11 @@ $access->model();                 // the Access model, to write or for its own c
 `find()` also returns inactive accesses, and `expand()` and `contentsOf()` answer for them as for
 active ones, because existing grants stay valid. `expand()` is the exact inverse of
 the resolver: for each slug it lists, the resolver names this access.
+
+What `find()` returns is a snapshot: after a save, call `find()` again. Accesses are read once per
+request; a long-running console process (a daemon, a loop in a command) sees writes from other
+processes only after `AccessGraph::forget()`. Queue workers and Octane reset it between jobs and
+requests on their own. Before the migration has run, `find()` throws.
 
 **Credits apply to the access granted directly, never through nesting.** `creditLines()` reads the
 access itself and nothing it contains, so nesting a coaching access into a bundle does not credit
