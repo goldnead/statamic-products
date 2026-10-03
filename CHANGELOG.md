@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.7.0 — unreleased
+## 1.7.0 — 2026-10-03
 
-Minor: new table, new API, nothing removed. Not tagged until CI is green.
+Minor: new table, new API, nothing removed.
 
 ### Added: accesses, the record behind a grant slug
 
