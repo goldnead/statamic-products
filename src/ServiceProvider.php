@@ -4,6 +4,7 @@ namespace Goldnead\StatamicProducts;
 
 use Goldnead\Entitlements\Contracts\PackageResolver;
 use Goldnead\Entitlements\Support\NullPackageResolver;
+use Goldnead\Entitlements\Support\ProductCatalog;
 use Goldnead\StatamicPayments\Cp\SuiteNav;
 use Goldnead\StatamicPayments\Support\Brands;
 use Goldnead\StatamicPayments\Support\Catalogue;
@@ -12,6 +13,7 @@ use Goldnead\StatamicProducts\Http\Controllers\Cp\ProductsController;
 use Goldnead\StatamicProducts\Models\Product;
 use Goldnead\StatamicProducts\Support\AccessGraph;
 use Goldnead\StatamicProducts\Support\AccessPackageResolver;
+use Goldnead\StatamicProducts\Support\GrantableAccesses;
 use Illuminate\Support\Facades\Log;
 use Statamic\Facades\CP\Nav;
 use Statamic\Facades\Utility;
@@ -47,7 +49,28 @@ class ServiceProvider extends AddonServiceProvider
         // looks like a missing product rather than a missing registration.
         // `statamic-offers` learned this the same way.
         $this->bootCatalogue()
-            ->bindPackageResolver();
+            ->bindPackageResolver()
+            ->registerGrantableAccesses();
+    }
+
+    /**
+     * Die Zugaenge mit Namen fuer die Auswahlfelder von statamic-entitlements.
+     *
+     * Ueber ein Container-Tag und nicht ueber `Entitlements::registerProducts()`:
+     * ein Tag haengt nicht davon ab, ob entitlements' Provider schon registriert
+     * ist, und loest nichts auf. Den `EntitlementManager` hier aufzuloesen hiesse,
+     * ihn vor `bindPackageResolver()` festzulegen (siehe dort).
+     *
+     * Nur wenn entitlements die Naht hat (ab 1.6.0, `ProductCatalog`). Aeltere
+     * Versionen und Installationen ohne entitlements fragen nie nach.
+     */
+    protected function registerGrantableAccesses(): self
+    {
+        if (class_exists(ProductCatalog::class)) {
+            $this->app->tag(GrantableAccesses::class, ProductCatalog::TAG);
+        }
+
+        return $this;
     }
 
     /**

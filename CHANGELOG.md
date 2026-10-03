@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added: accesses by name in the entitlements pickers
+
+With `goldnead/statamic-entitlements` 1.6 or later installed, every access is registered in its
+product catalogue (`GrantableAccesses`, container tag `entitlements.product-catalog`). The manual
+grant form, the limits form and the "Zugänge" section on a user page offer the accesses by name
+instead of asking for a slug. Retired accesses are included and marked "(inaktiv)"; with several
+brands the brand name is the group. Nothing is read at boot, and before `php artisan migrate` the
+source answers with nothing. With older entitlements versions or without entitlements nothing
+changes; the addon still boots without it.
+
 ## 1.7.0 — 2026-10-03
 
 Minor: new table, new API, nothing removed.
