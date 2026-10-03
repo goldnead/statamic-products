@@ -140,7 +140,7 @@ class ProductScreenTest extends TestCase
     public function creating_has_a_page_of_its_own_and_lands_on_the_new_product(): void
     {
         $this->actingAs($this->user())
-            ->get('/cp/utilities/products/create')
+            ->get('/cp/utilities/products/new')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('statamic-products::Products/Create')
@@ -171,7 +171,7 @@ class ProductScreenTest extends TestCase
         $user = $this->userWithoutPermission();
 
         $this->actingAs($user)->getJson('/cp/utilities/products/'.$product->id)->assertForbidden();
-        $this->actingAs($user)->getJson('/cp/utilities/products/create')->assertForbidden();
+        $this->actingAs($user)->getJson('/cp/utilities/products/new')->assertForbidden();
     }
 
     #[Test]

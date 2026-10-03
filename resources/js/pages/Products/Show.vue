@@ -18,7 +18,7 @@
 import { computed, ref } from 'vue';
 import { Head, router } from '@statamic/cms/inertia';
 import {
-    Header, Button, Badge, Panel, Card, Text, DocsCallout, Listing, Alert, Heading,
+    Header, Button, Badge, CardPanel, Text, DocsCallout, Listing, Alert, Heading,
     Dropdown, DropdownMenu, DropdownItem, ConfirmationModal, CommandPaletteItem,
 } from '@statamic/cms/ui';
 import ProductFields from './Fields.vue';
@@ -134,18 +134,20 @@ function paidAt(iso) {
 
         <Alert v-if="deleteError" variant="error" :text="deleteError" class="mb-4" />
 
-        <ProductFields :form="values" :errors="errors" :context="form" :product="product" :t="t" />
-
-        <Heading :text="t.show_action" size="lg" class="mt-8 mb-4" />
-
-        <div class="space-y-6">
+        <ProductFields :form="values" :errors="errors" :context="form" :product="product" :t="t">
+          <!-- Der vierte Tab: dieselbe weisse Karte im grauen Rahmen wie die
+               Formular-Tabs. Die Tabellen sind core's Listing und sitzen in der
+               Karte, jede unter ihrer Ueberschrift. -->
+          <template #related>
+            <CardPanel>
+              <div class="space-y-8">
             <!-- Offers: only when the offers addon is there. -->
-            <Panel v-if="offers !== null" :heading="t.section_offers" :subheading="t.section_offers_hint">
-                <Card v-if="offers.length === 0">
-                    <div class="py-8 text-center">
-                        <Text size="sm" variant="subtle">{{ t.offers_empty }}</Text>
-                    </div>
-                </Card>
+            <section v-if="offers !== null">
+                <Heading :text="t.section_offers" />
+                <Text size="sm" variant="subtle" class="mb-3">{{ t.section_offers_hint }}</Text>
+                <div v-if="offers.length === 0" class="py-8 text-center">
+                    <Text size="sm" variant="subtle">{{ t.offers_empty }}</Text>
+                </div>
                 <Listing
                     v-else
                     :items="offers"
@@ -177,15 +179,15 @@ function paidAt(iso) {
                         </div>
                     </template>
                 </Listing>
-            </Panel>
+            </section>
 
             <!-- Buyers: only once the payments tables exist. -->
-            <Panel v-if="buyers !== null" :heading="t.section_buyers" :subheading="buyersHint">
-                <Card v-if="buyers.length === 0">
-                    <div class="py-8 text-center">
-                        <Text size="sm" variant="subtle">{{ t.buyers_empty }}</Text>
-                    </div>
-                </Card>
+            <section v-if="buyers !== null">
+                <Heading :text="t.section_buyers" />
+                <Text size="sm" variant="subtle" class="mb-3">{{ buyersHint }}</Text>
+                <div v-if="buyers.length === 0" class="py-8 text-center">
+                    <Text size="sm" variant="subtle">{{ t.buyers_empty }}</Text>
+                </div>
                 <Listing
                     v-else
                     :items="buyerItems"
@@ -216,8 +218,11 @@ function paidAt(iso) {
                         </div>
                     </template>
                 </Listing>
-            </Panel>
-        </div>
+            </section>
+              </div>
+            </CardPanel>
+          </template>
+        </ProductFields>
 
         <!-- `:open`, not `v-if`: the modal owns its visibility and focus trap. -->
         <ConfirmationModal
