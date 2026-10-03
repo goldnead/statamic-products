@@ -31,12 +31,20 @@ jobs:
         # matches what composer.json actually promises.
         laravel: ['^12.0', '^13.0']
         stability: [prefer-lowest, prefer-stable]
+        # `latest` = whatever ^1.4 resolves to. The extra row pins the version
+        # adriangoldner.com runs, on current everything else.
+        entitlements: [latest]
         exclude:
           # Laravel 13 requires PHP ^8.3.
           - php: '8.2'
             laravel: '^13.0'
+        include:
+          - php: '8.3'
+            laravel: '^13.0'
+            stability: prefer-stable
+            entitlements: '1.4.0'
 
-    name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }} · ${{ matrix.stability }}
+    name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }} · ${{ matrix.stability }} · entitlements ${{ matrix.entitlements }}
 
     steps:
       - uses: actions/checkout@v4
@@ -51,7 +59,33 @@ jobs:
       - name: Install dependencies
         run: |
           composer require "laravel/framework:${{ matrix.laravel }}" --no-interaction --no-update
+          if [ "${{ matrix.entitlements }}" != "latest" ]; then
+            composer require --dev "goldnead/statamic-entitlements:${{ matrix.entitlements }}" --no-interaction --no-update
+          fi
           composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+
+      - name: Run tests
+        run: vendor/bin/phpunit
+
+  # statamic-entitlements is optional (require-dev, suggest). The resolver is
+  # only bound when its interface exists, and this leg proves the addon boots
+  # and passes without it: the resolver tests skip, everything else must run.
+  without-entitlements:
+    runs-on: ubuntu-latest
+    name: Without statamic-entitlements
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, intl, fileinfo
+          coverage: none
+
+      - run: composer install --prefer-dist --no-interaction
+
+      - run: composer remove --dev goldnead/statamic-entitlements --no-interaction
 
       - name: Run tests
         run: vendor/bin/phpunit

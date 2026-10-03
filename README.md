@@ -227,8 +227,79 @@ slugs, so payments and entitlements notice nothing. A slug without an access rec
 is listed below the picker as unresolved, not as an error. `ref` becomes optional when one of the
 granted slugs is an access, because the access then keeps the contents.
 
-Credits apply to the access granted directly, never through nesting. Reading accesses (a lookup
-API and a transitive `PackageResolver` for `statamic-entitlements`) is not part of this release.
+### Setting it up on a site
+
+Everything a site tells this addon goes into the `boot()` of one of its service providers:
+
+```php
+use Goldnead\StatamicProducts\Support\AccessContainers;
+use Goldnead\StatamicProducts\Support\ContentKinds;
+use Goldnead\StatamicProducts\Support\SessionTypes;
+
+ContentKinds::register('community', 'Community-Bereich', 'Space (Kennung)');
+SessionTypes::register('8f0c…', 'Einzelsession');
+AccessContainers::allow(['assets', 'downloads']);
+```
+
+With `goldnead/statamic-entitlements` (^1.4) installed there is nothing else to do: the addon puts
+its own `PackageResolver` in place of entitlements' empty default, and a grant on an access then
+covers everything the access contains. **A resolver the site binds itself always wins**, whatever
+order the providers run in; the addon only replaces `NullPackageResolver`. To keep bundles off
+entirely, bind a resolver that returns `[]`. Without entitlements the addon binds nothing and works
+as before.
+
+One limit: entitlements' `EntitlementManager` is a singleton and keeps the resolver it got when it
+was first resolved. If something resolves it before this addon's provider has registered (in an
+earlier provider's `register()`, say), it keeps the empty default and this resolver does not apply.
+
+### What a grant covers
+
+The same rules for the resolver and for `Accesses` below:
+
+- A grant on an access covers the `ref` of each of its contents, and through contents of kind
+  `access` everything the nested access covers, at any depth. So
+  `Entitlements::allows($user, 'cvt-101')` is true for a grant on an access that holds `cvt-101` two
+  levels down.
+- For a `course` the key is its entry id **and** the slug `statamic-courses` asks about (the entry's
+  `product` field, else its slug).
+- **`active` does not change what existing grants cover.** It only decides whether an access is
+  offered and granted anew (picker, new sales). A retired access resolves exactly like an active
+  one, held directly or nested, so buyers of a retired offer keep what they bought. To take access
+  away, revoke the grant in `statamic-entitlements` (`revoke()`); deactivating does not.
+- A pointer to an access without a record covers that slug and ends there.
+- Cycles end; every access is entered once.
+- Across all brands: slugs are unique over every brand and a grant carries none.
+- All accesses are read once per request (also per Octane request and queued job), and a save or
+  delete of an access is visible to the next read in the same request. If the table cannot be read
+  (before `php artisan migrate`) the resolver answers "no bundles" and logs an error instead of
+  failing the page. That fallback is the resolver's only: `Accesses::find()` throws.
+
+### Reading accesses
+
+```php
+use Goldnead\StatamicProducts\Support\Accesses;
+
+$access = Accesses::find('choiraccelerator');   // null when there is no record
+
+$access->expand();                // every slug a grant covers, transitive, without its own
+$access->creditLines();           // this access's credit lines for new grants
+$access->creditLines(includeEnded: true);       // ... including ended ones, to replay an old grant
+$access->contentsOf('course');    // contents of one kind, nested accesses included, in order
+$access->model();                 // the Access model, to write or for its own contents only
+```
+
+`find()` also returns inactive accesses, and `expand()` and `contentsOf()` answer for them as for
+active ones, because existing grants stay valid. `expand()` is the exact inverse of
+the resolver: for each slug it lists, the resolver names this access.
+
+What `find()` returns is a snapshot: after a save, call `find()` again. Accesses are read once per
+request; a long-running console process (a daemon, a loop in a command) sees writes from other
+processes only after `AccessGraph::forget()`. Queue workers and Octane reset it between jobs and
+requests on their own. Before the migration has run, `find()` throws.
+
+**Credits apply to the access granted directly, never through nesting.** `creditLines()` reads the
+access itself and nothing it contains, so nesting a coaching access into a bundle does not credit
+sessions twice.
 
 ## What it will not do
 
@@ -246,7 +317,8 @@ API and a transitive `PackageResolver` for `statamic-entitlements`) is not part 
 - Statamic 6
 - `goldnead/statamic-payments` ^1.15
 
-Optional: `goldnead/statamic-brand-context` for multi-brand catalogues.
+Optional: `goldnead/statamic-brand-context` for multi-brand catalogues,
+`goldnead/statamic-entitlements` ^1.4 for grants that cover what an access contains.
 
 ## Licence
 
