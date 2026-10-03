@@ -10,23 +10,26 @@
  * nur den Replicator im Blueprint-Formular; dieses Formular ist von Hand
  * verdrahtet, also sind es Zeilen in einer Karte, getrennt durch Linien.
  *
- * Ob ein Verweis aufgeloest ist, sagt der Server (`access.targets`, nach
- * `kind|ref`). Eine Zeile, die noch nicht gespeichert ist, hat keine Auskunft
- * und sagt das auch.
+ * Wer es bedient, ist kein Entwickler. Deshalb: Auswahl statt Kennungen, wo
+ * immer eine Liste existiert (Zugaenge, Kurse, Termine, Sessiontypen, Dateien
+ * ueber core's Asset-Browser), und Klarnamen statt Zeilennummern.
  */
 import { computed, ref, useSlots, watch } from 'vue';
 import {
     Alert, Badge, Button, CardPanel, Combobox, Field, Input, Select, Switch, Textarea,
     TabContent, TabList, TabTrigger, Tabs, Text,
 } from '@statamic/cms/ui';
+import AssetPicker from './AssetPicker.vue';
 
 const props = defineProps({
     form: { type: Object, required: true },
     errors: { type: Object, default: () => ({}) },
-    // kinds, creditKinds, choices
+    // kinds, creditKinds, choices, sessionTypes, assetPickers
     context: { type: Object, required: true },
     // granted, targets, values: nur beim bestehenden Zugang
     access: { type: Object, default: null },
+    // Beim Anlegen fuellt sich die Kennung aus dem Namen, wie bei core.
+    autoHandle: { type: Boolean, default: false },
     t: { type: Object, required: true },
 });
 
@@ -40,6 +43,36 @@ const tabOfField = {
     contents: 'contents', credits: 'credits',
 };
 
+const sidebarFields = ['handle', 'active', 'opens_members_area'];
+
+function errorKeys() {
+    return Object.keys(props.errors || {}).filter((key) => key !== 'version');
+}
+
+// Wie viele Fehler in welchem Tab stehen. Ein Fehler in einem verdeckten Tab
+// waere sonst unsichtbar.
+const errorsByTab = computed(() => {
+    const counts = {};
+
+    errorKeys().forEach((key) => {
+        const name = tabOfField[key.split('.')[0]];
+
+        if (name) counts[name] = (counts[name] || 0) + 1;
+    });
+
+    return counts;
+});
+
+// Die Seitenspalte steht auf dem Handy unter dem Tab. Ihr Fehler (meist die
+// Kennung) steht deshalb zusaetzlich oben, sichtbar auf jedem Tab.
+const sidebarLabels = computed(() => ({
+    handle: props.t.field_handle, active: props.t.field_active, opens_members_area: props.t.access_members_area,
+}));
+
+const sidebarErrors = computed(() => sidebarFields
+    .filter((key) => props.errors?.[key])
+    .map((key) => `${sidebarLabels.value[key]}: ${props.errors[key]}`));
+
 watch(() => props.errors, (errors) => {
     const hit = Object.keys(errors || {}).map((key) => tabOfField[key.split('.')[0]]).find(Boolean);
 
@@ -47,6 +80,31 @@ watch(() => props.errors, (errors) => {
 });
 
 const granted = computed(() => Boolean(props.access?.granted));
+
+// ---- Kennung aus dem Namen ---------------------------------------------------
+
+const handleTouched = ref(Boolean(props.form.handle));
+
+/** Wie core's Slug: Kleinbuchstaben, Umlaute ausgeschrieben, sonst Bindestriche. */
+function slugify(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+        .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+watch(() => props.form.name, (name) => {
+    if (props.autoHandle && !handleTouched.value && !granted.value) {
+        props.form.handle = slugify(name);
+    }
+});
+
+function handleInput(value) {
+    handleTouched.value = value !== '';
+    props.form.handle = value;
+}
 
 // ---- Inhalte ---------------------------------------------------------------
 
@@ -76,8 +134,23 @@ function choicesFor(item) {
     return list;
 }
 
+const hasAssetPicker = computed(() => (props.context.assetPickers || []).length > 0);
+
+function usesAssetPicker(item) {
+    return item.kind === 'file' && hasAssetPicker.value;
+}
+
+// Ein eingebautes Ziel ohne Auswahlliste (Geschwister fehlt, nichts angelegt)
+// wird von Hand eingetragen. Das sagt das Feld dann auch.
+function manualFor(item) {
+    return !kindsByValue.value[item.kind]?.host && !choicesFor(item) && !usesAssetPicker(item);
+}
+
+// Die erste Art, die man bei einem Angebot am haeufigsten braucht: ein Kurs.
+const defaultKind = computed(() => (kindsByValue.value.course ? 'course' : props.context.kinds[0]?.value ?? null));
+
 function addContent() {
-    props.form.contents.push({ kind: props.context.kinds[0]?.value ?? null, ref: '', label: '' });
+    props.form.contents.push({ kind: defaultKind.value, ref: '', label: '' });
 }
 
 function removeContent(index) {
@@ -97,7 +170,7 @@ function target(item) {
     return props.access?.targets?.[`${item.kind}|${item.ref}`] || null;
 }
 
-const targetBadge = {
+const badgeOf = {
     resolved: { color: 'green', key: 'target_resolved' },
     missing: { color: 'red', key: 'target_missing' },
     unknowable: { color: 'default', key: 'target_unknowable' },
@@ -105,9 +178,46 @@ const targetBadge = {
 
 // ---- Guthaben --------------------------------------------------------------
 
+const sessionTypes = computed(() => props.context.sessionTypes || []);
+const sessionLabels = computed(() => Object.fromEntries(sessionTypes.value.map((type) => [type.value, type.label])));
+
+function sessionOptions(current) {
+    if (current && !sessionLabels.value[current]) {
+        return [{ value: current, label: current }, ...sessionTypes.value];
+    }
+
+    return sessionTypes.value;
+}
+
+// Gefunden, fehlt, nicht pruefbar: dieselbe Auskunft wie bei Inhalten, hier
+// im Browser, weil die Liste vollstaendig im Formular liegt.
+function sessionState(credit) {
+    if (!credit.session_type) return null;
+    if (sessionTypes.value.length === 0) return 'unknowable';
+
+    return sessionLabels.value[credit.session_type] ? 'resolved' : 'missing';
+}
+
+function creditTitle(credit) {
+    const type = sessionLabels.value[credit.session_type] || credit.session_type || '…';
+    const subscription = credit.kind === 'subscription';
+    const count = subscription ? credit.per_month : credit.count;
+
+    if (!count) return type;
+
+    return (subscription ? props.t.credit_summary_named_subscription : props.t.credit_summary_named)
+        .replace(':count', count)
+        .replace(':type', type);
+}
+
+function hasNumber(credit) {
+    return credit.line !== null && credit.line !== undefined;
+}
+
 function addCredit() {
     props.form.credits.push({
-        line: null, session_type: '', kind: props.context.creditKinds[0]?.value ?? 'one_time',
+        line: null, session_type: sessionTypes.value.length === 1 ? sessionTypes.value[0].value : '',
+        kind: props.context.creditKinds[0]?.value ?? 'one_time',
         count: null, per_month: null, valid_months: null, ended: false,
     });
 }
@@ -119,7 +229,16 @@ function removeCredit(index) {
 // Nach einer Vergabe ist eine Zeile mit Nummer nicht mehr loeschbar. Der Server
 // lehnt es ohnehin ab; hier faellt der Knopf weg, damit niemand es versucht.
 function creditRemovable(credit) {
-    return !(granted.value && credit.line !== null && credit.line !== undefined);
+    return !(granted.value && hasNumber(credit));
+}
+
+// Und eine nach der Vergabe beendete Zeile bleibt beendet.
+function endedLocked(credit) {
+    if (!granted.value || !hasNumber(credit)) return false;
+
+    const stored = (props.access?.values?.credits || []).find((line) => line.line === credit.line);
+
+    return Boolean(stored?.ended);
 }
 
 function numberOrNull(target, key, value) {
@@ -133,10 +252,16 @@ function error(key) {
 
 <template>
     <Tabs v-model="tab">
+        <Alert v-if="errorKeys().length" variant="error" class="mb-4">
+            <p>{{ t.form_errors }}</p>
+            <p v-for="message in sidebarErrors" :key="message" class="mt-1">{{ message }}</p>
+        </Alert>
+
         <TabList class="overflow-x-auto overflow-y-hidden">
-            <TabTrigger name="basics" :text="t.access_section_basics" class="whitespace-nowrap" />
-            <TabTrigger name="contents" :text="t.access_section_contents" class="whitespace-nowrap" />
-            <TabTrigger name="credits" :text="t.access_section_credits" class="whitespace-nowrap" />
+            <TabTrigger v-for="name in ['basics', 'contents', 'credits']" :key="name" :name="name" class="whitespace-nowrap">
+                {{ t[`access_section_${name}`] }}
+                <Badge v-if="errorsByTab[name]" pill color="red" :text="String(errorsByTab[name])" class="ms-1" />
+            </TabTrigger>
             <TabTrigger v-if="hasRelated" name="related" :text="t.access_section_products" class="whitespace-nowrap" />
         </TabList>
 
@@ -154,7 +279,14 @@ function error(key) {
                             </Field>
 
                             <Field :label="t.access_cover" :instructions="t.access_cover_help" :error="error('cover')">
-                                <Input v-model="form.cover" class="font-mono text-xs" />
+                                <AssetPicker
+                                    v-if="hasAssetPicker"
+                                    :model-value="form.cover || ''"
+                                    :pickers="context.assetPickers"
+                                    :container-label="t.asset_container"
+                                    @update:model-value="form.cover = $event"
+                                />
+                                <Input v-else v-model="form.cover" class="font-mono text-xs" />
                             </Field>
                         </div>
                     </CardPanel>
@@ -174,7 +306,7 @@ function error(key) {
                                 <li
                                     v-for="(item, index) in form.contents"
                                     :key="index"
-                                    class="grid gap-3 py-4 first:pt-0 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start"
+                                    class="grid gap-3 py-4 first:pt-0 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-start"
                                 >
                                     <Field :label="t.access_content_kind" :error="error(`contents.${index}.kind`)">
                                         <Select v-model="item.kind" :options="kindOptions(item.kind)" adaptive-width />
@@ -183,10 +315,18 @@ function error(key) {
                                     <div class="min-w-0 space-y-3">
                                         <Field
                                             :label="kindsByValue[item.kind]?.ref_label || t.access_content_kind"
+                                            :instructions="manualFor(item) ? t.content_ref_manual : null"
                                             :error="error(`contents.${index}.ref`)"
                                         >
+                                            <AssetPicker
+                                                v-if="usesAssetPicker(item)"
+                                                :model-value="item.ref || ''"
+                                                :pickers="context.assetPickers"
+                                                :container-label="t.asset_container"
+                                                @update:model-value="item.ref = $event"
+                                            />
                                             <Combobox
-                                                v-if="choicesFor(item)"
+                                                v-else-if="choicesFor(item)"
                                                 :model-value="item.ref || null"
                                                 :options="choicesFor(item)"
                                                 searchable
@@ -208,8 +348,8 @@ function error(key) {
                                                 <Badge
                                                     v-if="target(item)"
                                                     pill
-                                                    :color="targetBadge[target(item).state].color"
-                                                    :text="t[targetBadge[target(item).state].key]"
+                                                    :color="badgeOf[target(item).state].color"
+                                                    :text="t[badgeOf[target(item).state].key]"
                                                 />
                                                 <Badge v-else pill color="default" :text="t.target_unsaved" />
                                                 <Text v-if="target(item)?.label" size="sm" variant="subtle">{{ target(item).label }}</Text>
@@ -258,19 +398,22 @@ function error(key) {
                             </div>
 
                             <ol v-else class="divide-y divide-gray-200 dark:divide-gray-700">
-                                <li v-for="(credit, index) in form.credits" :key="credit.line ?? `neu-${index}`" class="space-y-3 py-4 first:pt-0">
+                                <li v-for="(credit, index) in form.credits" :key="hasNumber(credit) ? credit.line : `neu-${index}`" class="space-y-3 py-4 first:pt-0">
+                                    <!-- Kopf in Worten: was gutgeschrieben wird. Die Nummer
+                                         zaehlt ab 1; intern bleibt `line`, wie sie ist. -->
                                     <div class="flex flex-wrap items-center gap-2">
+                                        <Text variant="strong">{{ creditTitle(credit) }}</Text>
                                         <Badge
                                             pill
-                                            :color="credit.line === null || credit.line === undefined ? 'default' : 'blue'"
-                                            :text="credit.line === null || credit.line === undefined ? t.credit_new_line : t.credit_line.replace(':line', credit.line)"
+                                            color="default"
+                                            :text="hasNumber(credit) ? t.credit_line.replace(':line', credit.line + 1) : t.credit_new_line"
                                         />
                                         <Badge v-if="credit.ended" pill color="amber" :text="t.credit_ended_badge" />
                                         <span v-if="error(`credits.${index}.line`)" class="text-xs text-red-600 dark:text-red-400">{{ error(`credits.${index}.line`) }}</span>
 
                                         <div class="ms-auto flex items-center gap-3">
-                                            <label v-if="credit.line !== null && credit.line !== undefined" class="flex items-center gap-2 text-sm">
-                                                <Switch v-model="credit.ended" size="sm" />
+                                            <label v-if="hasNumber(credit)" class="flex items-center gap-2 text-sm">
+                                                <Switch v-model="credit.ended" size="sm" :disabled="endedLocked(credit)" />
                                                 {{ t.credit_ended }}
                                             </label>
                                             <Button
@@ -281,16 +424,30 @@ function error(key) {
                                             />
                                         </div>
                                     </div>
+                                    <span v-if="error(`credits.${index}.ended`)" class="block text-xs text-red-600 dark:text-red-400">{{ error(`credits.${index}.ended`) }}</span>
 
                                     <div class="grid gap-3 sm:grid-cols-2">
                                         <Field
                                             class="sm:col-span-2"
                                             :label="t.credit_session_type"
-                                            :instructions="t.credit_session_type_help"
+                                            :instructions="sessionTypes.length ? t.credit_session_type_help : t.credit_session_type_help_free"
                                             :error="error(`credits.${index}.session_type`)"
                                             required
                                         >
-                                            <Input v-model="credit.session_type" class="font-mono text-xs" />
+                                            <Combobox
+                                                v-if="sessionTypes.length"
+                                                :model-value="credit.session_type || null"
+                                                :options="sessionOptions(credit.session_type)"
+                                                @update:model-value="credit.session_type = $event || ''"
+                                            />
+                                            <Input v-else v-model="credit.session_type" class="font-mono text-xs" />
+                                            <div v-if="sessionState(credit)" class="mt-2">
+                                                <Badge
+                                                    pill
+                                                    :color="badgeOf[sessionState(credit)].color"
+                                                    :text="t[badgeOf[sessionState(credit)].key]"
+                                                />
+                                            </div>
                                         </Field>
 
                                         <Field :label="t.credit_kind" :error="error(`credits.${index}.kind`)" required>
@@ -370,7 +527,7 @@ function error(key) {
                         :error="error('handle')"
                         required
                     >
-                        <Input v-model="form.handle" class="font-mono" :disabled="granted" />
+                        <Input :model-value="form.handle" class="font-mono" :disabled="granted" @update:model-value="handleInput" />
                     </Field>
                 </CardPanel>
             </div>

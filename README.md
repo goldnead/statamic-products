@@ -181,8 +181,29 @@ site's own kinds are always "cannot be checked"; only the site knows what they p
 not even after a line was deleted (`credit_lines_issued` counts). It is the `<index>` in the
 site's idempotency key, so reusing one would make a later credit look like it already happened. An
 import may bring its own `line`; the counter then moves past the highest. Once the access has been
-granted a line can be **ended** (`ended_at`), not deleted. `session_type` is free text for now (the
-site's id or uuid); a registry for it is the next step.
+granted a line can be **ended** (`ended_at`), not deleted, and an ended line stays ended. These rules
+live in the model, so an import that bypasses the form is held to them too (a breach throws a
+`ValidationException`). The screen counts lines from 1; `line` itself stays as stored.
+
+**Session types** come from the site, with names:
+
+```php
+use Goldnead\StatamicProducts\Support\SessionTypes;
+
+SessionTypes::register('8f0c…', 'Einzelsession');
+SessionTypes::register('2b7d…', 'Gruppensession');
+```
+
+Once any are registered the form picks from them and refuses anything else (a type already stored
+stays savable and shows as gone). Without a registration the field is free text and every value
+shows as "cannot be checked".
+
+**Two tabs, one access.** The detail page sends a fingerprint of the state it loaded. If somebody
+saved in the meantime, the save is refused with HTTP 409 and a message instead of silently
+overwriting the newer state.
+
+Files and the cover are picked with core's own assets field and asset browser; the stored value is
+the asset id, `container::path`.
 
 **On the product**, "Opens" is a picker over the accesses of the current brand and still stores
 slugs, so payments and entitlements notice nothing. A slug without an access record stays valid and

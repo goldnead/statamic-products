@@ -5,6 +5,7 @@ namespace Goldnead\StatamicProducts\Http\Resources\Cp;
 use Goldnead\StatamicProducts\Models\Access;
 use Goldnead\StatamicProducts\Support\ContentKinds;
 use Goldnead\StatamicProducts\Support\RefTarget;
+use Goldnead\StatamicProducts\Support\SessionTypes;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -29,11 +30,12 @@ class ListedAccess extends JsonResource
             // Was die Spalte „Guthaben" zeigt: je Zeile Anzahl und Sessiontyp,
             // beendete Zeilen nicht. Kurz, weil die Zelle eine Zeile hat.
             'credits_summary' => implode(' · ', array_map(
-                fn (array $line) => ($line['kind'] === Access::CREDIT_SUBSCRIPTION
-                    ? __('statamic-products::messages.credit_summary_subscription', ['count' => $line['per_month']])
-                    : trans_choice('statamic-products::messages.credit_summary_one_time', (int) $line['count'], ['count' => $line['count']])),
+                [self::class, 'summary'],
                 array_values(array_filter($lines, fn (array $line) => ($line['ended_at'] ?? null) === null)),
             )),
+            'session_targets' => collect($lines)
+                ->mapWithKeys(fn (array $line) => [(string) ($line['session_type'] ?? '') => SessionTypes::target((string) ($line['session_type'] ?? ''))])
+                ->all(),
             'members' => $this->opens_members_area,
             'active' => $this->active,
             // Ein Inhalt, dessen Ziel fehlt: bezahlt und nichts dahinter. Nur
@@ -85,6 +87,29 @@ class ListedAccess extends JsonResource
         }
 
         return $targets;
+    }
+
+    /**
+     * Eine Zeile in Worten: „2 × Einzelsession", „6 × Gruppensession je Monat".
+     * Ohne angemeldeten Namen: „2 Sitzungen".
+     *
+     * @param  array<string, mixed>  $line
+     */
+    public static function summary(array $line): string
+    {
+        $subscription = ($line['kind'] ?? null) === Access::CREDIT_SUBSCRIPTION;
+        $count = (int) ($subscription ? ($line['per_month'] ?? 0) : ($line['count'] ?? 0));
+        $label = SessionTypes::label((string) ($line['session_type'] ?? ''));
+
+        if ($label !== null) {
+            return __($subscription
+                ? 'statamic-products::messages.credit_summary_named_subscription'
+                : 'statamic-products::messages.credit_summary_named', ['count' => $count, 'type' => $label]);
+        }
+
+        return $subscription
+            ? __('statamic-products::messages.credit_summary_subscription', ['count' => $count])
+            : trans_choice('statamic-products::messages.credit_summary_one_time', $count, ['count' => $count]);
     }
 
     public static function hasMissingContent(Access $access): bool

@@ -8,6 +8,7 @@ use Goldnead\StatamicProducts\Http\Resources\Cp\ListedAccess;
 use Goldnead\StatamicProducts\Models\Access;
 use Goldnead\StatamicProducts\Models\Product;
 use Goldnead\StatamicProducts\Support\ContentKinds;
+use Goldnead\StatamicProducts\Support\SessionTypes;
 use Goldnead\StatamicProducts\Support\Setup;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -20,6 +21,8 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Validator;
 use Inertia\Inertia;
 use Statamic\Entries\Entry as CoreEntry;
+use Statamic\Facades\AssetContainer;
+use Statamic\Facades\Blueprint;
 use Statamic\Facades\Entry as EntryFacade;
 use Statamic\Http\Controllers\CP\CpController;
 use Statamic\Http\Requests\FilteredRequest;
@@ -96,6 +99,7 @@ class AccessesController extends CpController
                 'targets' => $row['targets'],
                 'granted' => $access->hasBeenGranted(),
                 'version' => $access->version(),
+                'sessionTargets' => $row['session_targets'],
             ],
             'form' => $this->formContext($access),
             'products' => $this->productsGranting($access),
@@ -196,9 +200,16 @@ class AccessesController extends CpController
 
             'credits' => ['nullable', 'array', 'max:50'],
             'credits.*.line' => ['nullable', 'integer', 'min:0'],
-            // Freitext bis zur Registry der Website (Z2): adg traegt hier die
-            // VocalFlow-UUID des Sessiontyps ein.
-            'credits.*.session_type' => ['required', 'string', 'max:191'],
+            // Hat die Website ihre Sessiontypen angemeldet, nur diese (und was
+            // an diesem Zugang schon steht, damit ein abgemeldeter Typ nicht
+            // jede andere Aenderung blockiert). Sonst Freitext.
+            'credits.*.session_type' => [
+                'required', 'string', 'max:191',
+                ...(SessionTypes::known() ? [Rule::in(array_values(array_unique([
+                    ...SessionTypes::ids(),
+                    ...array_map(fn (array $line) => (string) ($line['session_type'] ?? ''), $access?->creditLines() ?? []),
+                ])))] : []),
+            ],
             'credits.*.kind' => ['required', Rule::in(Access::creditKinds())],
             'credits.*.count' => ['nullable', 'required_if:credits.*.kind,'.Access::CREDIT_ONE_TIME, 'integer', 'min:1', 'max:999'],
             'credits.*.per_month' => ['nullable', 'required_if:credits.*.kind,'.Access::CREDIT_SUBSCRIPTION, 'integer', 'min:1', 'max:99'],
@@ -206,6 +217,7 @@ class AccessesController extends CpController
             'credits.*.ended' => ['nullable', 'boolean'],
         ], [
             'handle.in' => __('statamic-products::messages.access_handle_frozen'),
+            'credits.*.session_type.in' => __('statamic-products::messages.credit_session_type_unknown'),
         ], [
             'credits.*.count' => __('statamic-products::messages.credit_count'),
             'credits.*.per_month' => __('statamic-products::messages.credit_per_month'),
@@ -381,6 +393,14 @@ class AccessesController extends CpController
     {
         return [
             'kinds' => ContentKinds::options(),
+            'sessionTypes' => SessionTypes::options(),
+            'assetPickers' => $this->assetPickers(array_values(array_filter([
+                (string) ($current->cover ?? ''),
+                ...array_map(
+                    fn (array $item) => $item['ref'],
+                    array_filter($current?->contentItems() ?? [], fn (array $item) => $item['kind'] === ContentKinds::FILE),
+                ),
+            ], fn (string $id) => str_contains($id, '::')))),
             'creditKinds' => array_map(fn (string $kind) => [
                 'value' => $kind,
                 'label' => __('statamic-products::messages.credit_kind_'.$kind),
@@ -399,6 +419,60 @@ class AccessesController extends CpController
                 ContentKinds::EVENT => $this->eventChoices(),
             ],
         ];
+    }
+
+    /**
+     * Ein Assets-Feld von core je Container, fuer Dateien und das Titelbild.
+     *
+     * Core's Feld braucht einen Container, sobald es mehr als einen gibt, und
+     * seine `meta` (Container, Rechte, Ordner) entsteht serverseitig. Also
+     * baut der Server je Container ein Blueprint mit genau einem Feld; das
+     * Formular stellt es in einen `PublishContainer` und nimmt die erste ID.
+     * Gespeichert wird weiter `container::pfad`, genau die Asset-ID.
+     *
+     * `$ids` sind die Assets, die dieser Zugang schon traegt. Ihre Daten
+     * (Name, Vorschau, Groesse) kommen in `meta.data` mit, sonst zeigte das
+     * Feld nach dem Neuladen „0/1", obwohl die Datei gespeichert ist: core's
+     * Feld liest sie von dort und laedt sie nicht nach. Jede Zeile filtert
+     * sich im Browser die eine heraus, die ihr gehoert.
+     *
+     * @param  list<string>  $ids
+     * @return list<array{handle: string, title: string, blueprint: array<string, mixed>, meta: array<string, mixed>}>
+     */
+    protected function assetPickers(array $ids = []): array
+    {
+        try {
+            return AssetContainer::all()
+                ->sortBy(fn ($container) => $container->title())
+                ->map(function ($container) use ($ids) {
+                    $own = array_values(array_filter($ids, fn (string $id) => str_starts_with($id, $container->handle().'::')));
+
+                    $blueprint = Blueprint::makeFromFields([
+                        'asset' => [
+                            'type' => 'assets',
+                            'container' => $container->handle(),
+                            'max_files' => 1,
+                            'mode' => 'list',
+                            'display' => $container->title(),
+                            'hide_display' => true,
+                        ],
+                    ]);
+
+                    $fields = $blueprint->fields()->addValues(['asset' => $own])->preProcess();
+
+                    return [
+                        'handle' => (string) $container->handle(),
+                        'title' => (string) $container->title(),
+                        'blueprint' => $blueprint->toPublishArray(),
+                        'meta' => $fields->meta()->all(),
+                    ];
+                })
+                ->values()
+                ->all();
+        } catch (Throwable) {
+            // Ohne Picker bleibt das Textfeld; geprueft wird der Verweis trotzdem.
+            return [];
+        }
     }
 
     /**
@@ -533,6 +607,8 @@ class AccessesController extends CpController
             'credit_ended_badge', 'credit_locked_hint', 'access_products_hint', 'access_products_empty',
             'access_granted_note', 'col_contents', 'col_credits', 'col_members', 'access_missing_badge',
             'open_product', 'col_product',
+            'content_ref_manual', 'credit_session_type_help_free', 'credit_summary_named',
+            'credit_summary_named_subscription', 'asset_container', 'form_errors',
         ];
 
         $strings = [];

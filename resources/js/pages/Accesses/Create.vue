@@ -52,6 +52,6 @@ function save() {
             </CommandPaletteItem>
         </Header>
 
-        <AccessFields :form="values" :errors="errors" :context="form" :t="t" />
+        <AccessFields :form="values" :errors="errors" :context="form" :t="t" auto-handle />
     </div>
 </template>

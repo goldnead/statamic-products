@@ -21,6 +21,15 @@ The rules that protect data outside this addon:
 Pointers show found, gone or cannot be checked, like a product's `ref`
 (`RefTarget::forContent()`).
 
+The credit-line rules hold in the model as well, for imports that bypass the form: the counter
+never falls behind the stored one, a duplicate or previously issued `line` is refused, and after a
+grant the handle, every line and every ended line stay as they are. Saving the detail page from a
+stale tab is refused with 409 instead of overwriting the newer state.
+
+Session types come from the site through `SessionTypes::register($id, $label)`; the form then
+picks by name and refuses unknown ones. Files and the cover use core's assets field and asset
+browser.
+
 ### Changed: "Opens" on a product is a picker over the accesses
 
 Still stores slugs; payments and entitlements see no difference. Slugs without an access record
