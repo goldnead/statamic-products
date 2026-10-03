@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.0 — 2026-10-04
 
 ### Added: accesses by name in the entitlements pickers
 
