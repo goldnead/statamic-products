@@ -23,9 +23,17 @@ use Throwable;
  * Katalog" da. Inaktive tragen den Zusatz im Namen, damit niemand sie aus
  * Versehen neu vergibt.
  *
- * **Ueber alle Marken.** Eine Vergabe kennt keine Marke, und Slugs sind ueber
- * alle Marken eindeutig. Mit mehreren Marken steht der Markenname als Gruppe
- * dabei.
+ * **Marken (Entscheidung 03.10.2026).** Eine Vergabe kennt keine Marke, und
+ * Slugs sind ueber alle Marken eindeutig. Ist im CP eine Marke gewaehlt
+ * (`Brands::readerId()`), kommen nur deren Zugaenge: wer in „Nordlicht"
+ * arbeitet, soll in der Auswahl nicht die Zugaenge von „Halbmond" sehen. Ist
+ * keine gewaehlt (Konsole, Mehrmarken-CP ohne Auswahl), kommen alle, mit dem
+ * Markennamen als Gruppe, damit gleich benannte Zugaenge unterscheidbar sind.
+ * Ohne Mandanten kommen alle, ohne Gruppe.
+ *
+ * Die Kehrseite, bewusst in Kauf genommen: mit gewaehlter Marke benennt der
+ * Katalog die Vergaben auf Zugaenge anderer Marken nicht. Sie stehen dann mit
+ * ihrem Slug in Liste und Detail, gelten aber unveraendert.
  *
  * Kennt entitlements nicht als Klasse: angemeldet wird per Container-Tag
  * (`ServiceProvider::registerGrantableAccesses()`), und entitlements fragt
@@ -45,10 +53,21 @@ final class GrantableAccesses
             return [];
         }
 
-        $brands = $this->brandNames();
+        $reader = Brands::readerId();
+        $brands = $reader === null ? $this->brandNames() : [];
         $entries = [];
 
-        foreach (Access::query()->orderBy('name')->orderBy('handle')->get(['handle', 'name', 'active', 'brand_id']) as $access) {
+        $query = Access::query()
+            // Aktive zuerst: die ausgemusterten stehen nur zum Benennen da.
+            ->orderByDesc('active')
+            ->orderBy('name')
+            ->orderBy('handle');
+
+        if ($reader !== null) {
+            $query->where('brand_id', $reader);
+        }
+
+        foreach ($query->get(['handle', 'name', 'active', 'brand_id']) as $access) {
             $name = (string) ($access->name ?: $access->handle);
 
             $entries[(string) $access->handle] = [
