@@ -18,12 +18,11 @@ use Statamic\Facades\Entry;
 /**
  * Der transitive PackageResolver fuer statamic-entitlements.
  *
- * Die Regel, die hier festgehalten wird: **Ein inaktiver Zugang reicht nichts
- * weiter.** Wer einen Zugang haelt, der einen inaktiven enthaelt, bekommt
- * dessen Inhalte nicht, auch nicht ueber weitere Ebenen. Der Slug des
- * inaktiven Zugangs selbst bleibt Inhalt seines Behaelters (ein Verweis auf
- * einen Zugang ohne aktiven Datensatz endet dort, wie in `cycleThrough()`). Und
- * ein inaktiver Zugang deckt selbst nichts ab, auch wenn jemand ihn haelt.
+ * Die Regel, die hier festgehalten wird: **`active` steuert nur, ob ein Zugang
+ * neu vergeben oder angeboten wird, nicht was bestehende Vergaben abdecken.**
+ * Ein inaktiver Zugang wird aufgeloest wie ein aktiver, direkt und
+ * verschachtelt. Das CP sagt am Schalter: „Bestehende Vergaben gelten weiter."
+ * Wer wirklich entziehen will, nimmt `revoke()` in statamic-entitlements.
  */
 class AccessResolverTest extends TestCase
 {
@@ -113,31 +112,45 @@ class AccessResolverTest extends TestCase
     }
 
     #[Test]
-    public function deactivating_the_inner_access_cuts_what_it_contains(): void
+    public function deactivating_the_inner_access_keeps_existing_grants(): void
     {
         $this->threeLevels();
 
         Entitlements::grant($this->member(), 'aussen', 'manual');
         $this->assertTrue(Entitlements::allows($this->member(), 'cvt-101'));
 
-        // Im selben Request: der Speicher des Modells wirft das Gemerkte weg.
         Access::query()->where('handle', 'innen')->firstOrFail()->update(['active' => false]);
 
-        $this->assertFalse(Entitlements::allows($this->member(), 'cvt-101'));
-        // Der Slug selbst bleibt Inhalt von `mitte`.
+        $this->assertTrue(Entitlements::allows($this->member(), 'cvt-101'));
         $this->assertTrue(Entitlements::allows($this->member(), 'innen'));
     }
 
     #[Test]
-    public function an_inactive_outer_access_covers_nothing(): void
+    public function an_inactive_outer_access_still_covers_its_contents(): void
     {
+        // Ausgemustert, nicht entzogen: wer es gekauft hat, behaelt es.
         $this->threeLevels();
         Access::query()->where('handle', 'aussen')->firstOrFail()->update(['active' => false]);
 
         Entitlements::grant($this->member(), 'aussen', 'manual');
 
+        $this->assertTrue(Entitlements::allows($this->member(), 'cvt-101'));
+        $this->assertTrue(Entitlements::allows($this->member(), 'mitte'));
+    }
+
+    #[Test]
+    public function a_change_in_the_same_request_is_seen_by_the_next_check(): void
+    {
+        $this->threeLevels();
+
+        Entitlements::grant($this->member(), 'aussen', 'manual');
+        $this->assertTrue(Entitlements::allows($this->member(), 'cvt-101'));
+
+        // Das Modell wirft das Gemerkte beim Speichern weg.
+        Access::query()->where('handle', 'mitte')->firstOrFail()->update(['contents' => []]);
+
         $this->assertFalse(Entitlements::allows($this->member(), 'cvt-101'));
-        $this->assertFalse(Entitlements::allows($this->member(), 'mitte'));
+        $this->assertFalse(Entitlements::allows($this->member(), 'innen'));
     }
 
     #[Test]

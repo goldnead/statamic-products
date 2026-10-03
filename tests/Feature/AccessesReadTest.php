@@ -51,15 +51,15 @@ class AccessesReadTest extends TestCase
     }
 
     #[Test]
-    public function expand_stops_at_an_inactive_access_and_in_a_cycle(): void
+    public function expand_goes_through_inactive_accesses_and_ends_in_a_cycle(): void
     {
         $this->access('innen', [['kind' => 'community', 'ref' => 'raum']], ['active' => false]);
         $this->access('a', [['kind' => 'access', 'ref' => 'b'], ['kind' => 'access', 'ref' => 'innen']]);
         $this->access('b', [['kind' => 'access', 'ref' => 'a']]);
 
-        $this->assertEqualsCanonicalizing(['b', 'innen'], Accesses::find('a')->expand());
-        // Inaktiv: gefunden (fuer Guthaben beim Nachspielen), aber es oeffnet nichts.
-        $this->assertSame([], Accesses::find('innen')->expand());
+        $this->assertEqualsCanonicalizing(['b', 'innen', 'raum'], Accesses::find('a')->expand());
+        // Ausgemustert, nicht entzogen: bestehende Vergaben oeffnen weiter alles.
+        $this->assertSame(['raum'], Accesses::find('innen')->expand());
         $this->assertFalse(Accesses::find('innen')->active());
     }
 
@@ -95,7 +95,7 @@ class AccessesReadTest extends TestCase
 
         $courses = Accesses::find('aussen')->contentsOf('course');
 
-        $this->assertSame(['kurs-1', 'kurs-2'], array_column($courses, 'ref'));
+        $this->assertSame(['kurs-1', 'kurs-2', 'kurs-9'], array_column($courses, 'ref'));
         $this->assertSame('Erster', $courses[0]['label']);
         $this->assertSame(['assets::a.pdf'], array_column(Accesses::find('aussen')->contentsOf('file'), 'ref'));
     }
