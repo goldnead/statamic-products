@@ -7,8 +7,9 @@
 With `goldnead/statamic-entitlements` 1.6 or later installed, every access is registered in its
 product catalogue (`GrantableAccesses`, container tag `entitlements.product-catalog`). The manual
 grant form, the limits form and the "Zugänge" section on a user page offer the accesses by name
-instead of asking for a slug. Retired accesses are included and marked "(inaktiv)"; with several
-brands the brand name is the group. Nothing is read at boot, and before `php artisan migrate` the
+instead of asking for a slug. Retired accesses are included, marked "(inaktiv)" and listed last.
+With a brand chosen in the Control Panel only that brand's accesses are offered; with none chosen,
+all of them with the brand name as the group. Nothing is read at boot, and before `php artisan migrate` the
 source answers with nothing. With older entitlements versions or without entitlements nothing
 changes; the addon still boots without it.
 

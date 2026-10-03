@@ -256,7 +256,8 @@ With entitlements 1.6 or later the addon also announces every access by name to 
 product catalogue (the container tag `entitlements.product-catalog`). The grant form under
 Users > Entitlements, the limits form and the "Zugänge" section on a user page then offer a picker
 with names instead of a slug to type. Retired accesses are listed too, marked "(inaktiv)", because
-existing grants on them still apply; with several brands the brand name stands next to each. Read
+existing grants on them still apply. With a brand chosen only that brand's accesses are offered;
+with none chosen all of them, each with its brand name. Read
 when a form opens, so a new access is in the picker on the next page load. Older entitlements
 versions never ask, and nothing changes there.
 
