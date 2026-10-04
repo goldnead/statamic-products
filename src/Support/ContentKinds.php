@@ -2,6 +2,10 @@
 
 namespace Goldnead\StatamicProducts\Support;
 
+use Closure;
+use Illuminate\Support\Facades\Log;
+use Throwable;
+
 /**
  * Was ein Zugang enthalten kann.
  *
@@ -17,6 +21,8 @@ namespace Goldnead\StatamicProducts\Support;
  * Das ist die kleinste Naht, die das Formular braucht, um eine Art anbieten und
  * pruefen zu koennen. Eine Art der Website wird gespeichert und angezeigt, ihr
  * Verweis gilt als „nicht pruefbar": nur die Website weiss, worauf er zeigt.
+ * Es sei denn, sie gibt eine Quelle fuer Namen (`options:`) und einen
+ * Resolver (`resolver:`) mit, siehe {@see self::register()}.
  */
 final class ContentKinds
 {
@@ -28,7 +34,7 @@ final class ContentKinds
 
     public const EVENT = 'event';
 
-    /** @var array<string, array{label: string, ref_label: string|null}> */
+    /** @var array<string, array{label: string, ref_label: string|null, options: Closure|null, resolver: Closure|null}> */
     private static array $registered = [];
 
     /**
@@ -36,10 +42,80 @@ final class ContentKinds
      *
      * Am besten im `boot()` eines ServiceProviders der Website. Die Beschriftung
      * wird so angezeigt, wie sie hier steht; uebersetzen ist Sache des Aufrufers.
+     *
+     * `$options` macht aus dem Textfeld eine Auswahl mit Namen: ein Callable ohne
+     * Argumente, das `[Wert => Beschriftung]` liefert. Es laeuft, wenn das Formular
+     * aufgeht, nicht beim Anmelden. Wirft es oder liefert es etwas anderes, wird
+     * das protokolliert und das Formular bleibt beim Textfeld.
+     *
+     * `$resolver` beantwortet die Pruefung des Verweises, ein Callable mit dem
+     * Verweis als Argument: eine Zeichenkette (gefunden, das ist der Name),
+     * `null` (gibt es nicht mehr) oder `RefTarget::unknowable()` (kann ich nicht
+     * pruefen). Wirft er, gilt der Verweis als nicht pruefbar. Ohne Resolver ist
+     * jeder Verweis der Art „nicht pruefbar", auch mit Auswahl.
+     *
+     * @param  (callable(): array<array-key, string>)|null  $options
+     * @param  (callable(string): (string|RefTarget|null))|null  $resolver
      */
-    public static function register(string $kind, string $label, ?string $refLabel = null): void
+    public static function register(
+        string $kind,
+        string $label,
+        ?string $refLabel = null,
+        ?callable $options = null,
+        ?callable $resolver = null,
+    ): void {
+        self::$registered[$kind] = [
+            'label' => $label,
+            'ref_label' => $refLabel,
+            'options' => $options === null ? null : Closure::fromCallable($options),
+            'resolver' => $resolver === null ? null : Closure::fromCallable($resolver),
+        ];
+    }
+
+    /**
+     * Die Auswahl einer Art der Website, jetzt gelesen.
+     *
+     * Null heisst: Textfeld. Das gilt ohne Quelle, bei einer leeren Liste und bei
+     * einer Quelle, die versagt (dann steht eine Warnung im Log). Eingebaute
+     * Arten haben hier nie etwas; ihre Listen baut der Controller.
+     *
+     * @return list<array{value: string, label: string}>|null
+     */
+    public static function choices(string $kind): ?array
     {
-        self::$registered[$kind] = ['label' => $label, 'ref_label' => $refLabel];
+        $source = self::$registered[$kind]['options'] ?? null;
+
+        if ($source === null) {
+            return null;
+        }
+
+        try {
+            $options = $source();
+
+            if (! is_array($options)) {
+                throw new \UnexpectedValueException('options must return [value => label], got '.get_debug_type($options));
+            }
+
+            $list = [];
+
+            foreach ($options as $value => $label) {
+                $list[] = ['value' => (string) $value, 'label' => (string) $label];
+            }
+        } catch (Throwable $e) {
+            Log::warning('statamic-products: options for content kind "'.$kind.'" failed, falling back to free text: '.$e->getMessage());
+
+            return null;
+        }
+
+        return $list === [] ? null : $list;
+    }
+
+    /**
+     * Der Resolver einer Art der Website, oder null.
+     */
+    public static function resolver(string $kind): ?Closure
+    {
+        return self::$registered[$kind]['resolver'] ?? null;
     }
 
     /** @return list<string> */

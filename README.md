@@ -175,7 +175,12 @@ ContentKinds::register('community', 'Community-Bereich', 'Space (Kennung)');
 ```
 
 Every pointer shows the same three states as a product's `ref`: found, gone, cannot be checked. A
-site's own kinds are always "cannot be checked"; only the site knows what they point at.
+site's own kinds are "cannot be checked" unless the site registers a resolver for them (see
+[Setting it up on a site](#setting-it-up-on-a-site)); only the site knows what they point at.
+
+In the course list, an entry of `statamic-courses` whose `kind` field is `material` is labelled
+"Title (Material)" (English CP: "Title (material)"). The field is read directly; a missing `kind`
+means a course, and `statamic-courses` is not required.
 
 **Credit lines:** `line` is assigned by the model, starts at 0 and is **never handed out twice**,
 not even after a line was deleted (`credit_lines_issued` counts). It is the `<index>` in the
@@ -240,6 +245,38 @@ ContentKinds::register('community', 'Community-Bereich', 'Space (Kennung)');
 SessionTypes::register('8f0c…', 'Einzelsession');
 AccessContainers::allow(['assets', 'downloads']);
 ```
+
+**A site's own kind with names.** Without more, a registered kind is a text field and the person
+filling the form has to know the identifier. Give it an options source and, optionally, a resolver:
+
+```php
+use Goldnead\StatamicProducts\Support\ContentKinds;
+use Goldnead\StatamicProducts\Support\RefTarget;
+use Statamic\Facades\Entry;
+
+ContentKinds::register(
+    'library',
+    'Bibliothek',
+    'Bibliothek',
+    // [value => label], read when the form opens (not at boot).
+    options: fn () => Entry::query()->where('collection', 'libraries')->get()
+        ->mapWithKeys(fn ($e) => [$e->id() => $e->get('title')])->all(),
+    // A string = found, that is its name. null = gone. RefTarget::unknowable() = cannot say.
+    resolver: fn (string $ref) => Entry::find($ref)?->get('title'),
+);
+```
+
+- `options` is any callable returning `[value => label]`. The access form then shows a searchable
+  combobox with the names instead of a text field. If it throws, returns something else, or returns
+  an empty list, a warning goes to the log and the form shows the text field. A pointer that is
+  stored but not in the list (deleted, other brand) stays selectable and is shown as saved.
+- `resolver` answers the pointer check: a string is the name (found), `null` means gone, a
+  `RefTarget` (`resolved($name)`, `missing()`, `unknowable()`) is taken as is. If it throws, the
+  pointer counts as "cannot be checked" and a warning is logged; that answer is not remembered for
+  the request. Without a resolver every pointer of the kind stays "cannot be checked", also when
+  there are options.
+- Both are optional and independent. Existing `register($kind, $label, $refLabel)` calls behave as
+  before. Saving never rejects a pointer for not being in the options.
 
 With `goldnead/statamic-entitlements` (^1.4) installed there is nothing else to do: the addon puts
 its own `PackageResolver` in place of entitlements' empty default, and a grant on an access then

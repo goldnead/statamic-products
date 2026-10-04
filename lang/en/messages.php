@@ -217,6 +217,7 @@ return [
     'content_ref_file' => 'File',
     'content_ref_event' => 'Date',
     'content_ref_host' => 'Reference',
+    'content_course_material' => 'material',
     'content_ref_manual' => 'Typed by hand because no picker is available here.',
 
     'credit_session_type_help_free' => 'The website has not registered any session types yet. Enter the handle as it is kept there.',

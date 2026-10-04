@@ -217,6 +217,7 @@ return [
     'content_ref_file' => 'Datei',
     'content_ref_event' => 'Termin',
     'content_ref_host' => 'Verweis',
+    'content_course_material' => 'Material',
     'content_ref_manual' => 'Von Hand eingetragen, weil hier keine Auswahl zur Verfügung steht.',
 
     'credit_session_type_help_free' => 'Die Website hat noch keine Sessiontypen angemeldet. Trag die Kennung so ein, wie sie dort geführt wird.',

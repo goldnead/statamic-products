@@ -5,6 +5,7 @@ namespace Goldnead\StatamicProducts\Support;
 use Goldnead\StatamicProducts\Models\Access;
 use Goldnead\StatamicProducts\Models\Product;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Statamic\Entries\Entry as CoreEntry;
 use Statamic\Facades\Asset as AssetFacade;
@@ -161,8 +162,8 @@ final class RefTarget
      *
      * Same three answers as for a product's `ref`, and the same promise: never
      * throws. The kinds a site registers itself (`community` on
-     * adriangoldner.com) are always unknowable here, because only the site knows
-     * what their pointer names.
+     * adriangoldner.com) are unknowable here unless the site registered a
+     * resolver with them, because only the site knows what their pointer names.
      */
     public static function forContent(string $kind, string $ref): self
     {
@@ -184,13 +185,69 @@ final class RefTarget
                 ContentKinds::COURSE => self::course($ref),
                 ContentKinds::FILE => self::asset($ref),
                 ContentKinds::EVENT => self::event($ref),
-                default => new self(self::UNKNOWABLE),
+                default => self::hostKind($kind, $ref),
             };
         } catch (Throwable) {
             return new self(self::UNKNOWABLE);
         }
 
         return self::$memo[$key] = $target;
+    }
+
+    /** Gefunden, mit Namen. Fuer den Resolver einer Art der Website. */
+    public static function resolved(?string $label = null): self
+    {
+        return new self(self::RESOLVED, $label);
+    }
+
+    /** Gibt es nicht (mehr). Fuer den Resolver einer Art der Website. */
+    public static function missing(): self
+    {
+        return new self(self::MISSING);
+    }
+
+    /** Kann die Website nicht sagen. Fuer den Resolver einer Art der Website. */
+    public static function unknowable(): self
+    {
+        return new self(self::UNKNOWABLE);
+    }
+
+    /**
+     * Eine Art, die die Website angemeldet hat. Ohne Resolver weiss nur sie,
+     * worauf der Verweis zeigt, also nicht pruefbar. Mit Resolver gilt seine
+     * Antwort; wirft er, ist das keine Antwort und wird nicht gemerkt.
+     */
+    private static function hostKind(string $kind, string $ref): self
+    {
+        $resolver = ContentKinds::resolver($kind);
+
+        if ($resolver === null) {
+            return new self(self::UNKNOWABLE);
+        }
+
+        try {
+            $answer = $resolver($ref);
+        } catch (Throwable $e) {
+            Log::warning('statamic-products: resolver for content kind "'.$kind.'" failed, reference cannot be checked: '.$e->getMessage());
+
+            throw $e;
+        }
+
+        if ($answer instanceof self) {
+            return $answer;
+        }
+
+        if ($answer === null) {
+            return new self(self::MISSING);
+        }
+
+        if (is_string($answer)) {
+            return new self(self::RESOLVED, $answer);
+        }
+
+        Log::warning('statamic-products: resolver for content kind "'.$kind.'" returned '.get_debug_type($answer).', expected string, RefTarget or null; reference cannot be checked.');
+
+        return new self(self::UNKNOWABLE);
     }
 
     /** Another access, by its slug. Ours, so always checkable. */
