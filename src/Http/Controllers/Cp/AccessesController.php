@@ -432,6 +432,17 @@ class AccessesController extends CpController
      */
     protected function formContext(?Access $current = null): array
     {
+        // Auswahlen der Arten, die die Website angemeldet hat. Jede Quelle
+        // laeuft hier, beim Oeffnen des Formulars; wer versagt, fehlt in der
+        // Liste und bleibt ein Textfeld.
+        $hostChoices = [];
+
+        foreach (ContentKinds::all() as $kind) {
+            if (! ContentKinds::isBuiltIn($kind) && ($list = ContentKinds::choices($kind)) !== null) {
+                $hostChoices[$kind] = $list;
+            }
+        }
+
         return [
             'kinds' => ContentKinds::options(),
             'sessionTypes' => SessionTypes::options(),
@@ -448,7 +459,7 @@ class AccessesController extends CpController
             ], Access::creditKinds()),
             // Auswahllisten fuer die Arten, deren Ziele dieses Addon kennt. Fehlt
             // eine, tippt man den Verweis von Hand; er wird trotzdem geprueft.
-            'choices' => [
+            'choices' => $hostChoices + [
                 ContentKinds::ACCESS => Access::query()->forBrand()
                     ->when($current, fn (Builder $q) => $q->whereKeyNot($current->getKey()))
                     ->orderBy('name')
@@ -539,13 +550,31 @@ class AccessesController extends CpController
 
             return EntryFacade::whereCollection($collection)
                 ->filter(fn ($entry) => $entry instanceof CoreEntry)
-                ->map(fn (CoreEntry $entry) => ['value' => (string) $entry->id(), 'label' => (string) ($entry->get('title') ?: $entry->slug())])
+                ->map(fn (CoreEntry $entry) => [
+                    'value' => (string) $entry->id(),
+                    'label' => $this->courseLabel($entry),
+                ])
                 ->sortBy('label')
                 ->values()
                 ->all();
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Der Name in der Kursauswahl. Material aus `statamic-courses` (ab 0.4.0
+     * traegt der Eintrag `kind`, fehlt es, ist es ein Kurs) bekommt den Zusatz,
+     * damit man es neben einem Kurs erkennt. Das Feld wird direkt gelesen,
+     * ohne dieses Paket anzufassen.
+     */
+    protected function courseLabel(CoreEntry $entry): string
+    {
+        $title = (string) ($entry->get('title') ?: $entry->slug());
+
+        return $entry->get('kind') === 'material'
+            ? $title.' ('.__('statamic-products::messages.content_course_material').')'
+            : $title;
     }
 
     /**

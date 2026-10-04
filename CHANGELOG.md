@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased (1.9.0)
+
+Minor: new optional arguments, nothing removed, no migration.
+
+### Added: named pickers for the content kinds a site registers
+
+`ContentKinds::register()` takes two more optional named arguments, `options` and `resolver`. With
+`options` (a callable returning `[value => label]`, read when the access form opens) the form shows
+a searchable picker with names instead of a text field for that kind; a source that throws, returns
+a non-array or an empty list is logged and the field stays free text. With `resolver` (a string =
+found, `null` = gone, or a `RefTarget`) the pointer check can answer found or gone instead of always
+"cannot be checked"; a throwing resolver is logged and counts as "cannot be checked".
+`RefTarget::resolved()`, `missing()` and `unknowable()` are new for that. Calls without the new
+arguments behave exactly as before.
+
+### Changed: material in the course list
+
+An entry of `statamic-courses` whose `kind` field is `material` is labelled "Title (Material)" (en:
+"Title (material)") in the course picker of the access form. The field is read directly, so
+`statamic-courses` stays optional; a missing `kind` means a course.
+
 ## 1.8.0 — 2026-10-04
 
 ### Added: accesses by name in the entitlements pickers
