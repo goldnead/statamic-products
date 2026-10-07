@@ -50,7 +50,9 @@ class ListedAccess extends JsonResource
                 'cover' => $this->cover,
                 'active' => $this->active,
                 'opens_members_area' => $this->opens_members_area,
-                'contents' => $this->contentItems(),
+                // Mit dem Link fuer Kaeufer an Terminen: nur hier, im CP, und
+                // nie ueber `contentItems()` (die Lese-API der Website).
+                'contents' => $this->contentItemsForForm(),
                 // `ended` fuer den Schalter im Formular; gespeichert wird das Datum.
                 'credits' => array_map(fn (array $line) => [
                     'line' => $line['line'],
