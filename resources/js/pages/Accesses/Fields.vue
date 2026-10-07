@@ -363,6 +363,15 @@ function error(key) {
                                             <Input v-model="item.label" />
                                         </Field>
 
+                                        <Field
+                                            v-if="item.kind === 'event'"
+                                            :label="t.content_buyer_url"
+                                            :instructions="t.content_buyer_url_help"
+                                            :error="error(`contents.${index}.buyer_url`)"
+                                        >
+                                            <Input v-model="item.buyer_url" type="url" placeholder="https://" />
+                                        </Field>
+
                                         <div class="flex flex-wrap items-center gap-2">
                                             <template v-if="item.ref">
                                                 <Badge

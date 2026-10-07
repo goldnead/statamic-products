@@ -132,11 +132,55 @@ final class AccessGraph
     }
 
     /**
+     * Die Links fuer Kaeufer an den Terminen, die eine Vergabe auf `$handle`
+     * erreicht, in Reihenfolge, je Termin einmal (der erste Link gewinnt).
+     *
+     * Nur fuer jemanden, der `$handle` haelt. Diese Klasse weiss nicht, wer
+     * fragt; das prueft `Accesses::buyerLinksFor()` oder die Website.
+     *
+     * @return list<array{access: string, ref: string, label: string|null, url: string}>
+     */
+    public function buyerLinks(string $handle): array
+    {
+        $links = [];
+        $urls = [];
+
+        foreach ($this->walkWithOwner($handle) as [$owner, $item]) {
+            if ($item['kind'] !== ContentKinds::EVENT || isset($links[$item['ref']])) {
+                continue;
+            }
+
+            $url = ($urls[$owner->handle] ??= $owner->buyerLinks())[$item['ref']] ?? null;
+
+            if ($url !== null) {
+                $links[$item['ref']] = [
+                    'access' => (string) $owner->handle,
+                    'ref' => $item['ref'],
+                    'label' => $item['label'],
+                    'url' => $url,
+                ];
+            }
+        }
+
+        return array_values($links);
+    }
+
+    /**
      * Alle Inhalte, die eine Vergabe auf `$handle` erreicht, tiefe zuerst.
      *
      * @return list<array{kind: string, ref: string, label: string|null}>
      */
     private function walk(string $handle): array
+    {
+        return array_map(static fn (array $pair): array => $pair[1], $this->walkWithOwner($handle));
+    }
+
+    /**
+     * Wie `walk()`, jeder Inhalt mit dem Zugang, an dem er steht.
+     *
+     * @return list<array{0: Access, 1: array{kind: string, ref: string, label: string|null}}>
+     */
+    private function walkWithOwner(string $handle): array
     {
         $items = [];
         $visited = [];
@@ -152,7 +196,7 @@ final class AccessGraph
             $visited[$node] = true;
 
             foreach ($access->contentItems() as $item) {
-                $items[] = $item;
+                $items[] = [$access, $item];
 
                 if ($item['kind'] === ContentKinds::ACCESS) {
                     $visit($item['ref']);

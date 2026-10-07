@@ -203,6 +203,13 @@ class AccessesController extends CpController
             'contents.*.kind' => ['required', 'string', Rule::in(array_values(array_unique($kinds)))],
             'contents.*.ref' => ['required', 'string', 'max:191'],
             'contents.*.label' => ['nullable', 'string', 'max:191'],
+            // Der private Link an einem Termin (Access::buyerLinks()). Nur
+            // http(s); an anderen Arten wird er beim Speichern verworfen.
+            'contents.*.'.Access::BUYER_URL => ['nullable', 'string', 'max:2048', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (is_string($value) && trim($value) !== '' && Access::safeBuyerUrl($value) === null) {
+                    $fail(__('statamic-products::messages.content_buyer_url_invalid'));
+                }
+            }],
 
             'credits' => ['nullable', 'array', 'max:50'],
             'credits.*.line' => ['nullable', 'integer', 'min:0'],
@@ -269,16 +276,28 @@ class AccessesController extends CpController
     }
 
     /**
+     * Ein Termin behaelt seinen Link fuer Kaeufer, jede andere Art verliert ihn.
+     *
      * @param  array<int, array<string, mixed>>  $contents
-     * @return list<array{kind: string, ref: string, label: string|null}>
+     * @return list<array{kind: string, ref: string, label: string|null, buyer_url?: string}>
      */
     protected function contents(array $contents): array
     {
-        return array_values(array_map(fn (array $item) => [
-            'kind' => (string) $item['kind'],
-            'ref' => trim((string) $item['ref']),
-            'label' => isset($item['label']) && trim((string) $item['label']) !== '' ? trim((string) $item['label']) : null,
-        ], $contents));
+        return array_values(array_map(function (array $item): array {
+            $out = [
+                'kind' => (string) $item['kind'],
+                'ref' => trim((string) $item['ref']),
+                'label' => isset($item['label']) && trim((string) $item['label']) !== '' ? trim((string) $item['label']) : null,
+            ];
+
+            $url = $out['kind'] === ContentKinds::EVENT ? Access::safeBuyerUrl($item[Access::BUYER_URL] ?? null) : null;
+
+            if ($url !== null) {
+                $out[Access::BUYER_URL] = $url;
+            }
+
+            return $out;
+        }, $contents));
     }
 
     /**
@@ -681,7 +700,7 @@ class AccessesController extends CpController
             'access_description', 'access_description_help', 'access_cover', 'access_cover_help',
             'access_members_area', 'access_members_area_help', 'access_active_help',
             'access_contents_help', 'access_contents_empty', 'access_content_add', 'access_content_kind',
-            'access_content_label', 'access_content_label_help', 'access_content_remove', 'access_content_up', 'access_content_down',
+            'access_content_label', 'access_content_label_help', 'content_buyer_url', 'content_buyer_url_help', 'access_content_remove', 'access_content_up', 'access_content_down',
             'target_resolved', 'target_missing', 'target_unknowable', 'target_unsaved',
             'access_credits_help', 'access_credits_empty', 'credit_add', 'credit_remove', 'credit_line',
             'credit_new_line', 'credit_session_type', 'credit_session_type_help', 'credit_kind', 'credit_count',

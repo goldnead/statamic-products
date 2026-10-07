@@ -50,7 +50,9 @@ class ListedAccess extends JsonResource
                 'cover' => $this->cover,
                 'active' => $this->active,
                 'opens_members_area' => $this->opens_members_area,
-                'contents' => $this->contentItems(),
+                // Mit dem Link fuer Kaeufer an Terminen: nur hier, im CP, und
+                // nie ueber `contentItems()` (die Lese-API der Website).
+                'contents' => self::formContents($this->resource),
                 // `ended` fuer den Schalter im Formular; gespeichert wird das Datum.
                 'credits' => array_map(fn (array $line) => [
                     'line' => $line['line'],
@@ -63,6 +65,23 @@ class ListedAccess extends JsonResource
                 ], $lines),
             ],
         ];
+    }
+
+    /**
+     * Die Inhalte fuer das Formular: wie `contentItems()`, Termine mit ihrem Link.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function formContents(Access $access): array
+    {
+        $links = $access->buyerLinks();
+
+        return array_map(
+            static fn (array $item): array => $item['kind'] === ContentKinds::EVENT
+                ? $item + [Access::BUYER_URL => $links[$item['ref']] ?? null]
+                : $item,
+            $access->contentItems(),
+        );
     }
 
     /**

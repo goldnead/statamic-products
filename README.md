@@ -352,6 +352,23 @@ requests on their own. Before the migration has run, `find()` throws.
 access itself and nothing it contains, so nesting a coaching access into a bundle does not credit
 sessions twice.
 
+### A private link on an event
+
+`statamic-events` gates nothing; an event's `online_url` is public. For a paid webinar, an `event`
+in an access can carry a **link for buyers** (the form field under the event, stored as
+`buyer_url`, http(s) only). It never appears in `contentItems()` or `contentsOf()`. It is read
+only for someone who holds the access:
+
+```php
+Accesses::buyerLinksFor($user);           // with statamic-entitlements: active grants only
+Accesses::buyerLinks(['webinar-oktober']); // without: pass the slugs the viewer holds, nothing else
+
+// [['access' => 'webinar-oktober', 'ref' => '<event uuid>', 'label' => null, 'url' => 'https://…']]
+```
+
+Nested accesses count, `active` does not; a revoked, expired or pending grant hands out nothing.
+Showing the link (account page, mail) is the site's job.
+
 ## What it will not do
 
 - **No course player, no community engine, no members area.** The addon says a product *is* a

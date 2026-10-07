@@ -48,6 +48,9 @@ class Access extends Model
 
     public const CREDIT_SUBSCRIPTION = 'subscription';
 
+    /** Der Schluessel des privaten Links an einem Termin-Inhalt, {@see buyerLinks()}. */
+    public const BUYER_URL = 'buyer_url';
+
     protected $table = 'product_accesses';
 
     protected $guarded = [];
@@ -292,6 +295,56 @@ class Access extends Model
         }
 
         return $items;
+    }
+
+    /**
+     * Die Links fuer Kaeufer an den eigenen Terminen, nach Termin-`ref`.
+     *
+     * Ein Termin (`event`) kann einen privaten Link tragen, den nur sieht, wer
+     * den Zugang haelt, etwa den Teilnahme-Link eines Webinars. statamic-events
+     * gated nichts, `online_url` am Termin ist oeffentlich; deshalb steht er hier
+     * und **nie** in `contentItems()`. Gelesen wird er nur ueber
+     * `Accesses::buyerLinks()` / `buyerLinksFor()`.
+     *
+     * Nur http(s)-Adressen; alles andere wird hier verworfen, auch wenn es am
+     * Formular vorbei in die Spalte kam.
+     *
+     * @return array<string, string>
+     */
+    public function buyerLinks(): array
+    {
+        $links = [];
+
+        foreach ((array) ($this->contents ?? []) as $item) {
+            if (! is_array($item) || ($item['kind'] ?? null) !== ContentKinds::EVENT) {
+                continue;
+            }
+
+            $ref = is_string($item['ref'] ?? null) ? trim($item['ref']) : '';
+            $url = self::safeBuyerUrl($item[self::BUYER_URL] ?? null);
+
+            if ($ref !== '' && $url !== null && ! isset($links[$ref])) {
+                $links[$ref] = $url;
+            }
+        }
+
+        return $links;
+    }
+
+    /** Eine http(s)-Adresse, getrimmt, sonst null. */
+    public static function safeBuyerUrl(mixed $url): ?string
+    {
+        if (! is_string($url)) {
+            return null;
+        }
+
+        $url = trim($url);
+
+        if ($url === '' || ! preg_match('#^https?://[^\s/?\#]+#i', $url) || filter_var($url, FILTER_VALIDATE_URL) === false) {
+            return null;
+        }
+
+        return $url;
     }
 
     /**
