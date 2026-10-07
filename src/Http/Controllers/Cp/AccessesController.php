@@ -502,10 +502,15 @@ class AccessesController extends CpController
                 ->map(function ($container) use ($ids) {
                     $own = array_values(array_filter($ids, fn (string $id) => str_starts_with($id, $container->handle().'::')));
 
+                    $folder = AccessContainers::folder((string) $container->handle());
+
                     $blueprint = Blueprint::makeFromFields([
                         'asset' => [
                             'type' => 'assets',
                             'container' => $container->handle(),
+                            // Ablage nur zum Teil erlaubt: Waehler startet im
+                            // Ordner und kommt nicht heraus.
+                            ...($folder !== null ? ['folder' => $folder, 'restrict' => true] : []),
                             'max_files' => 1,
                             'mode' => 'list',
                             'display' => $container->title(),

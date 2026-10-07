@@ -225,6 +225,11 @@ private containers are not recognised; a site that has some registers its list. 
 files and covers from any other container; a value already stored stays savable and is shown as
 gone with a note. With only one allowed container the container dropdown disappears.
 
+A container that holds private files next to the sold ones (an inbox folder, imported files) can be
+narrowed to one folder with a key: `AccessContainers::allow(['private_downloads' => 'downloads'])`.
+The picker then opens in that folder and cannot leave it, and the server refuses any file outside
+it (also `../`). Already stored values outside the folder stay savable.
+
 A granted access cannot be deleted, through the screen or through the model.
 
 **On the product**, "Opens" is a picker over the accesses of the current brand and still stores
