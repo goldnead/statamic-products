@@ -182,17 +182,20 @@ class AccessContainersTest extends TestCase
     }
 
     #[Test]
-    public function the_picker_of_a_narrowed_container_starts_in_and_stays_in_its_folder(): void
+    public function the_picker_of_a_narrowed_container_starts_in_its_folder_and_keeps_subfolders_visible(): void
     {
         AccessContainers::allow(['assets', 'downloads' => 'verkauf']);
 
+        // Core blendet bei `restrict` die Unterordner aus; liegen die Dateien
+        // in einem (`verkauf/baraye/`), bliebe der Waehler leer. Die Grenze
+        // zieht der Server (siehe die Tests zu allowsAsset), nicht der Waehler.
         $this->actingAs($this->user())
             ->get('/cp/utilities/product-accesses/new')
             ->assertInertia(fn ($page) => $page
                 ->has('form.assetPickers', 2)
                 ->where('form.assetPickers.1.handle', 'downloads')
                 ->where('form.assetPickers.1.blueprint.tabs.0.sections.0.fields.0.folder', 'verkauf')
-                ->where('form.assetPickers.1.blueprint.tabs.0.sections.0.fields.0.restrict', true));
+                ->where('form.assetPickers.1.blueprint.tabs.0.sections.0.fields.0.restrict', false));
     }
 
     #[Test]

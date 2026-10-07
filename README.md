@@ -227,8 +227,10 @@ gone with a note. With only one allowed container the container dropdown disappe
 
 A container that holds private files next to the sold ones (an inbox folder, imported files) can be
 narrowed to one folder with a key: `AccessContainers::allow(['private_downloads' => 'downloads'])`.
-The picker then opens in that folder and cannot leave it, and the server refuses any file outside
-it (also `../`). Already stored values outside the folder stay savable.
+The picker then opens in that folder, and the server refuses any file outside it (also `../`).
+The picker itself can still browse out of the folder, because core hides subfolders in a
+restricted picker and the files sit in a subfolder more often than not. Already stored values
+outside the folder stay savable.
 
 A granted access cannot be deleted, through the screen or through the model.
 

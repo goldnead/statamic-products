@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.11.1 — 2026-10-07
+
+Patch: the file picker of a narrowed container showed nothing when the files sit in a subfolder.
+
+### Fixed: empty file picker for `AccessContainers::allow(['container' => 'folder'])`
+
+1.10.0 opened the picker in the folder and set core's "restrict to folder". Core hides subfolders
+in a restricted picker, so a folder that holds only a subfolder (`downloads/baraye/…`) showed
+"1–2 of 2" and not one row, with no way in. The picker now only starts in the folder and no longer
+restricts. The boundary stays on the server, which refuses any file outside the folder, also `../`
+(unchanged since 1.10.0).
+
 ## 1.11.0 — 2026-10-07
 
 Minor: a new optional field on event contents and two read methods, nothing removed, no migration.
