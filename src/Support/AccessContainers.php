@@ -16,6 +16,12 @@ use Statamic\Facades\AssetContainer;
  * AccessContainers::allow(['assets', 'downloads']);
  * ```
  *
+ * Liegt in einer Ablage neben dem Verkaufsmaterial auch Privates (ein
+ * Eingangsordner, importierte Dateien), schraenkt ein Schluessel sie auf einen
+ * Ordner ein: `allow(['private_downloads' => 'downloads'])`. Der Dateiwaehler
+ * oeffnet und bleibt in diesem Ordner, und der Server lehnt jede Datei
+ * daneben ab (auch `../`).
+ *
  * **Ohne Anmeldung** gilt jeder Container ausser denen von
  * `statamic-clientrooms`: dessen Basis-Kennung (`statamic-clientrooms.container`)
  * und die Markenvarianten `<basis>-<markenId>`. Erkannt wird das an der
@@ -24,15 +30,23 @@ use Statamic\Facades\AssetContainer;
  */
 final class AccessContainers
 {
-    /** @var list<string>|null */
+    /** @var array<string, string|null>|null Kennung => Ordner (null: ganze Ablage) */
     private static ?array $allowed = null;
 
     /**
-     * @param  string|list<string>  $handles
+     * @param  string|array<int|string, string>  $handles  `['kennung']` oder `['kennung' => 'ordner']`
      */
     public static function allow(string|array $handles): void
     {
-        self::$allowed = array_values(array_unique([...(self::$allowed ?? []), ...(array) $handles]));
+        self::$allowed ??= [];
+
+        foreach ((array) $handles as $key => $value) {
+            [$handle, $folder] = is_int($key) ? [(string) $value, null] : [$key, self::cleanFolder((string) $value)];
+
+            // Ein Ordner, der einmal gesetzt ist, wird von einer spaeteren
+            // Freigabe der ganzen Ablage nicht wieder aufgemacht.
+            self::$allowed[$handle] = $folder ?? (self::$allowed[$handle] ?? null);
+        }
     }
 
     /**
@@ -45,7 +59,7 @@ final class AccessContainers
         $existing = AssetContainer::all()->map(fn ($container) => (string) $container->handle())->sort()->values()->all();
 
         if (self::$allowed !== null) {
-            return array_values(array_intersect($existing, self::$allowed));
+            return array_values(array_intersect($existing, array_keys(self::$allowed)));
         }
 
         return array_values(array_filter($existing, fn (string $handle) => ! self::isClientRoom($handle)));
@@ -63,7 +77,35 @@ final class AccessContainers
             return false;
         }
 
-        return self::allows(strstr($id, '::', true));
+        $handle = strstr($id, '::', true);
+
+        if (! self::allows($handle)) {
+            return false;
+        }
+
+        $folder = self::folder($handle);
+
+        if ($folder === null) {
+            return true;
+        }
+
+        $path = substr($id, strlen($handle) + 2);
+
+        return ! in_array('..', explode('/', $path), true)
+            && str_starts_with(ltrim($path, '/'), $folder.'/');
+    }
+
+    /** Auf welchen Ordner eine erlaubte Ablage eingeschraenkt ist, sonst null. */
+    public static function folder(string $handle): ?string
+    {
+        return self::$allowed[$handle] ?? null;
+    }
+
+    private static function cleanFolder(string $folder): ?string
+    {
+        $folder = trim($folder, '/');
+
+        return $folder === '' ? null : $folder;
     }
 
     private static function isClientRoom(string $handle): bool

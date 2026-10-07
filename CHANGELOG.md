@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.10.0 — 2026-10-07
+
+Minor: `AccessContainers::allow()` takes an optional folder per container, nothing removed, no migration.
+
+### Added: narrow an allowed container to one folder
+
+`AccessContainers::allow(['private_downloads' => 'downloads'])` allows the container only below that
+folder. The file picker in the access form opens in the folder and is restricted to it, and the
+server refuses files and covers outside it, including `../` paths. Before, an allowed container was
+open in full, so private folders next to the sold files could end up in a sold access. Plain
+handles behave as before; values already stored outside the folder stay savable.
+
 ## 1.9.0 — 2026-10-04
 
 Minor: new optional arguments, nothing removed, no migration.

@@ -135,6 +135,85 @@ class AccessContainersTest extends TestCase
         $this->assertSame('Neu', $access->fresh()->name);
     }
 
+    // ---- Ordner je Ablage ------------------------------------------------------
+
+    #[Test]
+    public function a_container_can_be_narrowed_to_one_folder(): void
+    {
+        AccessContainers::allow(['assets', 'downloads' => 'verkauf']);
+
+        $this->assertTrue(AccessContainers::allowsAsset('downloads::verkauf/plan.pdf'));
+        $this->assertTrue(AccessContainers::allowsAsset('downloads::verkauf/unter/plan.pdf'));
+        $this->assertTrue(AccessContainers::allowsAsset('assets::egal/bild.jpg'));
+        $this->assertFalse(AccessContainers::allowsAsset('downloads::inbox/privat.pdf'));
+        $this->assertFalse(AccessContainers::allowsAsset('downloads::verkaufX/plan.pdf'));
+        $this->assertFalse(AccessContainers::allowsAsset('downloads::verkauf/../inbox/privat.pdf'));
+        $this->assertFalse(AccessContainers::allowsAsset('downloads::plan.pdf'));
+        $this->assertSame('verkauf', AccessContainers::folder('downloads'));
+        $this->assertNull(AccessContainers::folder('assets'));
+    }
+
+    #[Test]
+    public function a_file_outside_the_allowed_folder_is_refused_by_the_server(): void
+    {
+        AccessContainers::allow(['downloads' => 'verkauf']);
+
+        $this->actingAs($this->user())
+            ->postJson('/cp/utilities/product-accesses', $this->payload([
+                'contents' => [['kind' => 'file', 'ref' => 'downloads::inbox/privat.pdf']],
+            ]))
+            ->assertJsonValidationErrors('contents.0.ref');
+
+        $this->actingAs($this->user())
+            ->postJson('/cp/utilities/product-accesses', $this->payload([
+                'cover' => 'downloads::community/bild.jpg',
+            ]))
+            ->assertJsonValidationErrors('cover');
+
+        $this->assertSame(0, Access::count());
+
+        $this->actingAs($this->user())
+            ->postJson('/cp/utilities/product-accesses', $this->payload([
+                'contents' => [['kind' => 'file', 'ref' => 'downloads::verkauf/plan.pdf']],
+            ]))
+            ->assertRedirect();
+
+        $this->assertSame('downloads::verkauf/plan.pdf', Access::first()->contents[0]['ref']);
+    }
+
+    #[Test]
+    public function the_picker_of_a_narrowed_container_starts_in_and_stays_in_its_folder(): void
+    {
+        AccessContainers::allow(['assets', 'downloads' => 'verkauf']);
+
+        $this->actingAs($this->user())
+            ->get('/cp/utilities/product-accesses/new')
+            ->assertInertia(fn ($page) => $page
+                ->has('form.assetPickers', 2)
+                ->where('form.assetPickers.1.handle', 'downloads')
+                ->where('form.assetPickers.1.blueprint.tabs.0.sections.0.fields.0.folder', 'verkauf')
+                ->where('form.assetPickers.1.blueprint.tabs.0.sections.0.fields.0.restrict', true));
+    }
+
+    #[Test]
+    public function a_stored_file_outside_the_folder_stays_savable(): void
+    {
+        $access = Access::create($this->payload([
+            'contents' => [['kind' => 'file', 'ref' => 'downloads::inbox/alt.pdf']],
+        ]));
+
+        AccessContainers::allow(['downloads' => 'verkauf']);
+
+        $this->actingAs($this->user())
+            ->patchJson('/cp/utilities/product-accesses/'.$access->id, $this->payload([
+                'name' => 'Neu',
+                'contents' => [['kind' => 'file', 'ref' => 'downloads::inbox/alt.pdf']],
+            ]))
+            ->assertRedirect();
+
+        $this->assertSame('Neu', $access->fresh()->name);
+    }
+
     // ---- aus dem Code-Review ---------------------------------------------------
 
     #[Test]
