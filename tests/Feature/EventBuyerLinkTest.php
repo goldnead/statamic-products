@@ -117,6 +117,61 @@ class EventBuyerLinkTest extends TestCase
     }
 
     #[Test]
+    public function the_record_as_array_or_json_drops_the_link(): void
+    {
+        $access = $this->webinar();
+
+        $this->assertStringNotContainsString('zoom', $access->toJson());
+        $this->assertStringNotContainsString('zoom', json_encode(Accesses::find('webinar')->model()));
+        $this->assertSame(self::EVENT, $access->toArray()['contents'][0]['ref']);
+    }
+
+    #[Test]
+    public function a_link_that_could_break_out_of_an_href_is_refused(): void
+    {
+        foreach ([
+            'https://a.de/x"onclick=alert(1)',
+            "https://a.de/x'y",
+            'https://a.de/<script>',
+            'https://user:pw@a.de/',
+            "https://a.de/\nx",
+            'https://a.de/ x',
+            'data:text/html,hi',
+            'ftp://a.de/',
+        ] as $url) {
+            $this->assertNull(Access::safeBuyerUrl($url), $url);
+        }
+
+        $this->assertSame(self::LINK, Access::safeBuyerUrl(self::LINK));
+        $this->assertSame('https://meet.example.com', Access::safeBuyerUrl(' https://meet.example.com '));
+    }
+
+    #[Test]
+    public function the_form_keeps_a_link_per_row_even_for_the_same_event(): void
+    {
+        $access = $this->access('doppelt', [
+            ['kind' => 'event', 'ref' => self::EVENT, 'buyer_url' => 'https://example.com/eins'],
+            ['kind' => 'course', 'ref' => 'kurs-1'],
+            ['kind' => 'event', 'ref' => self::EVENT, 'buyer_url' => 'https://example.com/zwei'],
+        ]);
+
+        $this->assertSame(
+            ['https://example.com/eins', null, 'https://example.com/zwei'],
+            array_map(fn (array $item) => $item['buyer_url'] ?? null, $access->contentItemsForForm()),
+        );
+    }
+
+    #[Test]
+    public function the_first_slug_alphabetically_wins_whatever_order_the_grants_come_in(): void
+    {
+        $this->access('b', [['kind' => 'event', 'ref' => self::EVENT, 'buyer_url' => 'https://example.com/b']]);
+        $this->access('a', [['kind' => 'event', 'ref' => self::EVENT, 'buyer_url' => 'https://example.com/a']]);
+
+        $this->assertSame(['https://example.com/a'], array_column(Accesses::buyerLinks(['b', 'a']), 'url'));
+        $this->assertSame(['https://example.com/a'], array_column(Accesses::buyerLinks(['a', 'b']), 'url'));
+    }
+
+    #[Test]
     public function a_nested_and_an_inactive_access_still_hand_out_the_link(): void
     {
         $this->webinar('webinar', ['active' => false]);

@@ -60,7 +60,10 @@ final class Accesses
      * selbst liest.
      *
      * Verschachtelte Zugaenge zaehlen, `active` nicht (wie ueberall: es steuert
-     * nur die Neuvergabe). Je Termin ein Eintrag, der erste Link gewinnt.
+     * nur die Neuvergabe). Je Termin ein Eintrag; fuehren mehrere gehaltene
+     * Zugaenge ihn, gewinnt der alphabetisch erste Slug. Die URL ist geprueft
+     * (http(s), keine Zeichen, die aus einem `href` ausbrechen), beim Ausgeben
+     * trotzdem escapen.
      *
      * @param  iterable<mixed>  $heldSlugs
      * @return list<array{access: string, ref: string, label: string|null, url: string}>
@@ -69,12 +72,20 @@ final class Accesses
     {
         $graph = app(AccessGraph::class);
         $links = [];
+        $slugs = [];
 
         foreach ($heldSlugs as $slug) {
-            if (! is_string($slug) || $slug === '') {
-                continue;
+            if (is_string($slug) && $slug !== '') {
+                $slugs[$slug] = true;
             }
+        }
 
+        // Feste Reihenfolge: fuehren zwei gehaltene Zugaenge denselben Termin mit
+        // verschiedenen Links, gewinnt nicht die zufaellige Reihenfolge der Vergaben.
+        $slugs = array_keys($slugs);
+        sort($slugs, SORT_STRING);
+
+        foreach ($slugs as $slug) {
             foreach ($graph->buyerLinks($slug) as $link) {
                 $links[$link['ref']] ??= $link;
             }

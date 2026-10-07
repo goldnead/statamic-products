@@ -10,8 +10,9 @@ An `event` in an access can carry a **link for buyers** (the meeting link of a p
 example). `statamic-events` gates nothing and its `online_url` is public, so the link lives on the
 access, http(s) only, and is read only for someone who holds it: `Accesses::buyerLinksFor($subject)`
 reads the active grants from statamic-entitlements, `Accesses::buyerLinks($heldSlugs)` takes the
-slugs. Nested accesses count; revoked, expired and pending grants do not. `contentItems()` and
-`contentsOf()` never carry the link.
+slugs. Nested accesses count; revoked, expired and pending grants do not. `contentItems()`,
+`contentsOf()` and the record as array or JSON never carry the link. Links that could break out of
+an `href` (quotes, angle brackets, whitespace, credentials before the host) are refused.
 
 ## 1.10.0 — 2026-10-07
 

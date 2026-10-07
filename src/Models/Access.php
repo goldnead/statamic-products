@@ -271,9 +271,30 @@ class Access extends Model
     /**
      * Die Inhalte, bereinigt: nur Eintraege mit Art und Verweis, in Reihenfolge.
      *
+     * **Ohne den Link fuer Kaeufer** ({@see buyerLinks()}): das hier liest jeder.
+     *
      * @return list<array{kind: string, ref: string, label: string|null}>
      */
     public function contentItems(): array
+    {
+        return $this->cleanItems(false);
+    }
+
+    /**
+     * Wie `contentItems()`, jeder Termin mit seinem Link fuer Kaeufer (oder null).
+     *
+     * **Nur fuer das Formular im CP.** Je Zeile, nicht je Termin: fuehrt ein
+     * Zugang denselben Termin zweimal, behaelt jede Zeile ihren Link.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function contentItemsForForm(): array
+    {
+        return $this->cleanItems(true);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function cleanItems(bool $withBuyerUrl): array
     {
         $items = [];
 
@@ -290,11 +311,39 @@ class Access extends Model
             }
 
             $label = $item['label'] ?? null;
+            $clean = ['kind' => $kind, 'ref' => $ref, 'label' => is_string($label) && $label !== '' ? $label : null];
 
-            $items[] = ['kind' => $kind, 'ref' => $ref, 'label' => is_string($label) && $label !== '' ? $label : null];
+            if ($withBuyerUrl && $kind === ContentKinds::EVENT) {
+                $clean[self::BUYER_URL] = self::safeBuyerUrl($item[self::BUYER_URL] ?? null);
+            }
+
+            $items[] = $clean;
         }
 
         return $items;
+    }
+
+    /**
+     * Als Array oder JSON ohne den Link fuer Kaeufer.
+     *
+     * Wer den Datensatz durchreicht (eine Antwort, ein Template, ein Export),
+     * gibt sonst die rohe Spalte samt Link weiter. Gelesen wird er nur ueber
+     * {@see buyerLinks()}.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        $array = parent::toArray();
+
+        if (is_array($array['contents'] ?? null)) {
+            $array['contents'] = array_map(
+                static fn (mixed $item): mixed => is_array($item) ? array_diff_key($item, [self::BUYER_URL => true]) : $item,
+                $array['contents'],
+            );
+        }
+
+        return $array;
     }
 
     /**
@@ -340,7 +389,12 @@ class Access extends Model
 
         $url = trim($url);
 
-        if ($url === '' || ! preg_match('#^https?://[^\s/?\#]+#i', $url) || filter_var($url, FILTER_VALIDATE_URL) === false) {
+        // Kein Leer- oder Steuerzeichen, kein Anfuehrungszeichen, keine spitze
+        // Klammer: der Wert landet in einem `href`. Keine Zugangsdaten vor dem Host.
+        if ($url === ''
+            || preg_match('/[\x00-\x20\x7F"\'<>\\\\`]/', $url)
+            || ! preg_match('#^https?://[^/?\#@]+(?:[/?\#]|$)#i', $url)
+            || filter_var($url, FILTER_VALIDATE_URL) === false) {
             return null;
         }
 
