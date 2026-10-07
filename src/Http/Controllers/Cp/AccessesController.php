@@ -528,8 +528,13 @@ class AccessesController extends CpController
                             'type' => 'assets',
                             'container' => $container->handle(),
                             // Ablage nur zum Teil erlaubt: Waehler startet im
-                            // Ordner und kommt nicht heraus.
-                            ...($folder !== null ? ['folder' => $folder, 'restrict' => true] : []),
+                            // Ordner. Kein `restrict`: core blendet dann die
+                            // Unterordner aus, und Dateien liegen meist in
+                            // einem (`downloads/baraye/`), der Waehler zeigte
+                            // „1-2 of 2" ohne eine Zeile. Dass nichts ausserhalb
+                            // gewaehlt wird, sichert der Server
+                            // ({@see AccessContainers::allowsAsset()}).
+                            ...($folder !== null ? ['folder' => $folder] : []),
                             'max_files' => 1,
                             'mode' => 'list',
                             'display' => $container->title(),
