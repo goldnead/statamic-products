@@ -160,6 +160,7 @@ class Access extends Model
         }
 
         $issued = max($storedIssued, (int) ($this->credit_lines_issued ?? 0));
+        $now = Carbon::now()->toIso8601String();
         $seen = [];
 
         foreach ($credits as $line) {
@@ -196,7 +197,23 @@ class Access extends Model
             }
 
             if (! is_int($line['line'] ?? null)) {
-                $credits[$i] = ['line' => $issued++] + $line;
+                // Neu angelegt: der Zeitpunkt, ab dem die Zeile existiert.
+                $credits[$i] = ['line' => $issued++, 'added_at' => $now] + $line;
+
+                continue;
+            }
+
+            // `added_at` ist nach dem Anlegen fest. Ein Formular oder Import, der
+            // es weglaesst oder aendert, schriebe die Zeile sonst rueckwirkend um.
+            if (array_key_exists($line['line'], $storedLines)) {
+                if (isset($storedLines[$line['line']]['added_at'])) {
+                    $credits[$i]['added_at'] = $storedLines[$line['line']]['added_at'];
+                } else {
+                    unset($credits[$i]['added_at']);
+                }
+            } elseif ($stored !== null && $stored->handle !== null && self::slugGranted((string) $stored->handle)) {
+                // Neue Nummer an einem schon vergebenen Zugang: die Zeile ist neu.
+                $credits[$i]['added_at'] = $now;
             }
         }
 
@@ -253,6 +270,40 @@ class Access extends Model
                 ]);
             }
         }
+    }
+
+    /**
+     * Die Guthabenzeilen, die zu einem Zeitpunkt schon existierten.
+     *
+     * Eine Zeile ohne `added_at` gilt als „schon immer da" (Uebernahme, Zeilen
+     * vor 1.12.0). Wer pruefen oder nachvergeben will, was zu einer Vergabe
+     * gehoerte, fragt mit deren Zeitpunkt; eine Zeile, die Adrian spaeter
+     * angelegt hat, gehoerte nicht dazu. Beendete Zeilen sind dabei (wie bei
+     * `creditLines()`), `ended_at` filtert das nicht.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function creditLinesAt(\DateTimeInterface $at): array
+    {
+        return array_values(array_filter(
+            $this->creditLines(),
+            static function (array $line) use ($at): bool {
+                $added = $line['added_at'] ?? null;
+
+                if ($added === null || $added === '') {
+                    return true;
+                }
+
+                try {
+                    return Carbon::parse((string) $added)->lessThanOrEqualTo($at);
+                } catch (Throwable $e) {
+                    Log::warning('statamic-products: unreadable added_at on a credit line, treated as always there.', ['line' => $line['line'] ?? null, 'exception' => $e->getMessage()]);
+
+                    // Unlesbar heisst nicht „neu": nicht still aus der Vergabe nehmen.
+                    return true;
+                }
+            },
+        ));
     }
 
     /**

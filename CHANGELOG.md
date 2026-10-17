@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.12.0 — 2026-10-17
+
+Minor: credit lines know when they were added (`backlog-products-guthabenzeile-added-at`).
+
+### Added: `added_at` on every credit line
+
+A credit line created from now on carries `added_at` (ISO 8601), set by the model when it numbers the
+line. Lines from the takeover (which bring their own number) and lines saved before 1.12.0 have no
+`added_at`, which means "has always been there". Once set it is fixed: a form or import that drops or
+changes it gets the stored value back.
+
+`Access::creditLinesAt($at)` and `AccessView::creditLines(includeEnded: …, at: $at)` return only the
+lines that existed at a given moment (a grant time). A site that checks or replays a grant uses it, so
+a line added to an already granted access neither shows up as "missing" for earlier purchases nor is
+re-issued to them. `ended_at` is unchanged; `creditLines()` without `at` behaves as before.
+
 ## 1.11.1 — 2026-10-07
 
 Patch: the file picker of a narrowed container showed nothing when the files sit in a subfolder.

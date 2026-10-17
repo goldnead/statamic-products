@@ -69,11 +69,15 @@ final class AccessView
      * `<ref>:<line>`), nimmt `includeEnded: true`: eine Zeile, die nach dem
      * Kauf beendet wurde, gehoerte zu diesem Kauf.
      *
+     * Mit `$at` (der Zeitpunkt der Vergabe) nur die Zeilen, die damals schon
+     * existierten: `added_at` leer heisst "schon immer", eine spaeter angelegte
+     * Zeile gehoerte nicht zu dieser Vergabe.
+     *
      * @return list<array<string, mixed>>
      */
-    public function creditLines(bool $includeEnded = false): array
+    public function creditLines(bool $includeEnded = false, ?\DateTimeInterface $at = null): array
     {
-        $lines = $this->access->creditLines();
+        $lines = $at !== null ? $this->access->creditLinesAt($at) : $this->access->creditLines();
 
         if ($includeEnded) {
             return $lines;
