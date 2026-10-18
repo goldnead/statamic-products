@@ -24,6 +24,7 @@
     "goldnead/statamic-entitlements": "^1.4"
   },
   "suggest": {
+    "goldnead/statamic-brand-context": "Show products as cards on the funnels map (1.17 or later).",
     "goldnead/statamic-entitlements": "Grants on an access then also cover what it contains, nested accesses included (^1.4)."
   },
   "autoload": {

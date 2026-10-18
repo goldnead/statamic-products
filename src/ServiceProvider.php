@@ -2,6 +2,7 @@
 
 namespace Goldnead\StatamicProducts;
 
+use Goldnead\BrandContext\Contracts\ProvidesMapObjects;
 use Goldnead\BrandContext\Map\MapObjectRegistry;
 use Goldnead\Entitlements\Contracts\PackageResolver;
 use Goldnead\Entitlements\Support\NullPackageResolver;
@@ -119,7 +120,11 @@ class ServiceProvider extends AddonServiceProvider
     {
         parent::boot();
 
-        $this->app->make(MapObjectRegistry::class)->register(ProductMapObjects::class);
+        // brand-context is only a dev requirement here (payments needs it, we do
+        // not), so the provider is registered only where it is installed.
+        if (interface_exists(ProvidesMapObjects::class)) {
+            $this->app->make(MapObjectRegistry::class)->register(ProductMapObjects::class);
+        }
     }
 
     public function bootAddon()

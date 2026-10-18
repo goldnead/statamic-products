@@ -11,6 +11,7 @@ product by its handle and shows its name, a link to the Control Panel, whether i
 list price. The card shows no number: orders are counted by `statamic-payments`, and this addon does
 not repeat that count.
 
+## 1.12.0 — 2026-10-17
 
 Minor: credit lines know when they were added (`backlog-products-guthabenzeile-added-at`).
 
