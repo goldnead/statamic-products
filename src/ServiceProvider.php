@@ -2,6 +2,7 @@
 
 namespace Goldnead\StatamicProducts;
 
+use Goldnead\BrandContext\Map\MapObjectRegistry;
 use Goldnead\Entitlements\Contracts\PackageResolver;
 use Goldnead\Entitlements\Support\NullPackageResolver;
 use Goldnead\Entitlements\Support\ProductCatalog;
@@ -10,6 +11,7 @@ use Goldnead\StatamicPayments\Support\Brands;
 use Goldnead\StatamicPayments\Support\Catalogue;
 use Goldnead\StatamicProducts\Http\Controllers\Cp\AccessesController;
 use Goldnead\StatamicProducts\Http\Controllers\Cp\ProductsController;
+use Goldnead\StatamicProducts\Integrations\Map\ProductMapObjects;
 use Goldnead\StatamicProducts\Models\Product;
 use Goldnead\StatamicProducts\Support\AccessGraph;
 use Goldnead\StatamicProducts\Support\AccessPackageResolver;
@@ -103,6 +105,21 @@ class ServiceProvider extends AddonServiceProvider
             : $resolver);
 
         return $this;
+    }
+
+    /**
+     * Announce our objects to the funnels map.
+     *
+     * In `boot()` and not `bootAddon()`: the registry is wired whether or not
+     * the addon was discovered through the manifest, the same reason the
+     * catalogue is wired in `register()` above. brand-context's singleton is
+     * bound in every provider's `register()`, so it is there by now.
+     */
+    public function boot()
+    {
+        parent::boot();
+
+        $this->app->make(MapObjectRegistry::class)->register(ProductMapObjects::class);
     }
 
     public function bootAddon()
