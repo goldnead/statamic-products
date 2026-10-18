@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.13.0 — 2026-10-18
+
+Minor: products can be pointed at from the funnels map.
+
+### Added: products as map objects
+
+Products register a map provider with `statamic-brand-context` (1.17). A funnels map can point at a
+product by its handle and shows its name, a link to the Control Panel, whether it is active, and its
+list price. The card shows no number: orders are counted by `statamic-payments`, and this addon does
+not repeat that count.
+
 ## 1.12.0 — 2026-10-17
 
 Minor: credit lines know when they were added (`backlog-products-guthabenzeile-added-at`).

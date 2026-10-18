@@ -371,6 +371,13 @@ Accesses::buyerLinks(['webinar-oktober']); // without: pass the slugs the viewer
 Nested accesses count, `active` does not; a revoked, expired or pending grant hands out nothing.
 Showing the link (account page, mail) is the site's job.
 
+## Funnels map
+
+With `goldnead/statamic-brand-context` 1.17, products appear as objects in a funnels map: pick one
+by name or handle, and the map shows its label, a link to edit it, whether it is active and its
+price. Each product is identified by its handle. The map shows no number for a product; orders are
+counted in `statamic-payments`.
+
 ## What it will not do
 
 - **No course player, no community engine, no members area.** The addon says a product *is* a
