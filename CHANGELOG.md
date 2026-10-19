@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.14.0 — 2026-10-19
+
+Minor: the product card on the funnels map shows a number.
+
+### Added: paid orders on the product's map card
+
+A product's card on the funnels map now shows the number of paid orders for that product in the
+period. An order counts once, whether it has a line for the product or names it in the legacy
+single-product column. This is the order count, not the revenue figure of the `statamic-payments`
+"Orders" insight.
+
+### Upgrading: no migration
+
 ## 1.13.0 — 2026-10-18
 
 Minor: products can be pointed at from the funnels map.

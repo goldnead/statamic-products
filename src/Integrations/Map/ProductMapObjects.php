@@ -6,7 +6,12 @@ use Goldnead\BrandContext\Contracts\ProvidesMapObjects;
 use Goldnead\BrandContext\Map\MapMetric;
 use Goldnead\BrandContext\Map\MapObject;
 use Goldnead\BrandContext\Map\MapPeriod;
+use Goldnead\StatamicPayments\Models\Payment;
+use Goldnead\StatamicPayments\Support\Brands;
 use Goldnead\StatamicProducts\Models\Product;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Products as objects the funnels map can point at.
@@ -16,10 +21,13 @@ use Goldnead\StatamicProducts\Models\Product;
  * changes. The map asks for the label, the link and the switch every time;
  * nothing here is cached.
  *
- * No metric. Orders for a product live in `statamic-payments`, and its own
- * "Orders" insight counts over currency and brand and a legacy single-product
- * column as well. Reproducing that count here would be a second, slightly
- * different number under the same name, so the card shows none.
+ * The metric is the number of paid orders for the product in the period. It
+ * is deliberately not the revenue figure of statamic-payments' "Orders"
+ * insight: the card counts orders, not money, so currencies are not split.
+ * A payment counts once if it has a line for the product, or, when it has no
+ * lines at all, if its single-product column names it. Only paid payments
+ * whose `paid_at` lies in the period and not in the future count, in the
+ * current brand.
  */
 class ProductMapObjects implements ProvidesMapObjects
 {
@@ -66,11 +74,38 @@ class ProductMapObjects implements ProvidesMapObjects
     }
 
     /**
-     * Null on purpose: see the class comment.
+     * Paid orders for the product over the period. Null when the payments
+     * table is missing or the product is unknown; see the class comment.
      */
     public function metric(string $id, MapPeriod $period): ?MapMetric
     {
-        return null;
+        if (! Schema::hasTable('payments') || $this->find($id) === null) {
+            return null;
+        }
+
+        $now = Carbon::now();
+
+        $orders = Brands::only(Payment::query(), Brands::readerId())
+            ->where('status', Payment::STATUS_PAID)
+            ->whereNotNull('paid_at')
+            ->where('paid_at', '>=', $period->from)
+            ->where('paid_at', '<', $period->to)
+            ->where('paid_at', '<=', $now)
+            ->where(fn (Builder $match) => $match
+                ->whereExists(fn ($line) => $line->from('payment_items')
+                    ->whereColumn('payment_items.payment_id', 'payments.id')
+                    ->where('payment_items.product', $id))
+                ->orWhere(fn ($legacy) => $legacy
+                    ->where('product', $id)
+                    ->whereNotExists(fn ($line) => $line->from('payment_items')
+                        ->whereColumn('payment_items.payment_id', 'payments.id'))))
+            ->count();
+
+        return new MapMetric(
+            (int) $orders,
+            __('statamic-products::messages.map_metric_orders'),
+            $period,
+        );
     }
 
     protected function toMapObject(Product $product): MapObject

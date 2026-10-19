@@ -231,4 +231,5 @@ return [
     'asset_container_not_allowed' => 'This container is not cleared for accesses that are sold, for example because it belongs to a client room.',
     'form_errors' => 'Saving did not work. The marked tabs and fields show what is missing.',
     'map_type_label' => 'Product',
+    'map_metric_orders' => 'Paid orders',
 ];
