@@ -231,4 +231,5 @@ return [
     'asset_container_not_allowed' => 'Diese Ablage ist für verkaufte Zugänge nicht freigegeben, etwa weil sie zu einem Klientenraum gehört.',
     'form_errors' => 'Speichern hat nicht geklappt. Die markierten Tabs und Felder zeigen, was fehlt.',
     'map_type_label' => 'Produkt',
+    'map_metric_orders' => 'Bezahlte Bestellungen',
 ];

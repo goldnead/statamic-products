@@ -5,17 +5,20 @@ namespace Goldnead\StatamicProducts\Tests\Feature;
 use Goldnead\BrandContext\Map\MapObjectRegistry;
 use Goldnead\BrandContext\Map\MapPeriod;
 use Goldnead\BrandContext\ServiceProvider as BrandContextServiceProvider;
+use Goldnead\StatamicPayments\Models\Payment;
+use Goldnead\StatamicPayments\Models\PaymentItem;
 use Goldnead\StatamicProducts\Integrations\Map\ProductMapObjects;
 use Goldnead\StatamicProducts\Models\Product;
 use Goldnead\StatamicProducts\Tests\TestCase;
+use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
  * Products as objects for the funnels map (brand-context 1.17).
  *
- * The map holds `type` and `id` and asks for everything else here. No metric:
- * orders are counted in statamic-payments, and this addon does not repeat
- * that count.
+ * The map holds `type` and `id` and asks for everything else here. The metric
+ * is the number of paid orders in the period, not the revenue figure of
+ * statamic-payments' "Orders" insight; see ProductMapObjects.
  */
 class ProductMapObjectsTest extends TestCase
 {
@@ -120,12 +123,88 @@ class ProductMapObjectsTest extends TestCase
         $this->assertNull($this->provider()->find('nicht-da'));
     }
 
+    /**
+     * A payment with lines for the given products. The first handle is the
+     * primary line. `$payment` overrides columns, e.g. `product`, the legacy
+     * single-product column on the payment.
+     *
+     * @param  list<string>  $lines
+     */
+    protected function order(array $lines, array $payment = []): Payment
+    {
+        $order = Payment::create(array_merge([
+            'product' => $lines[0] ?? 'etwas-anderes',
+            'provider_id' => 'tr_'.uniqid(),
+            'amount_cent' => 4900,
+            'currency' => 'EUR',
+            'status' => Payment::STATUS_PAID,
+            'provider' => 'fake',
+            'paid_at' => Carbon::now()->subDay(),
+        ], $payment));
+
+        foreach ($lines as $index => $handle) {
+            PaymentItem::create([
+                'payment_id' => $order->id,
+                'product' => $handle,
+                'name' => $handle,
+                'amount_cent' => 4900,
+                'kind' => $index === 0 ? PaymentItem::KIND_PRIMARY : PaymentItem::KIND_BUMP,
+            ]);
+        }
+
+        return $order;
+    }
+
     #[Test]
-    public function it_gives_no_metric_for_any_product(): void
+    public function the_metric_counts_paid_orders_of_the_product_in_the_period(): void
+    {
+        $this->produkt('atemkurs', 'Atemkurs');
+        $this->produkt('chorstimme', 'Chorstimme');
+
+        // Counted: paid, in the period, with a line for the product.
+        $this->order(['atemkurs']);
+        $this->order(['chorstimme', 'atemkurs']);
+
+        // Counted: the legacy column, no lines at all.
+        $this->order([], ['product' => 'atemkurs']);
+
+        // Counted once: a line and the legacy column on the same payment.
+        $this->order(['atemkurs'], ['product' => 'atemkurs']);
+
+        // Not counted: not paid.
+        $this->order(['atemkurs'], ['status' => Payment::STATUS_OPEN]);
+
+        // Not counted: paid outside the period.
+        $this->order(['atemkurs'], ['paid_at' => Carbon::now()->subDays(60)]);
+
+        // Not counted: paid in the future.
+        $this->order(['atemkurs'], ['paid_at' => Carbon::now()->addDay()]);
+
+        // Not counted: a payment with lines names another product in the column.
+        $this->order(['chorstimme'], ['product' => 'atemkurs']);
+
+        $metric = $this->provider()->metric('atemkurs', $this->period());
+
+        $this->assertNotNull($metric);
+        $this->assertSame(4, $metric->value);
+        $this->assertSame('Paid orders', $metric->what);
+        $this->assertSame('last 30 days', $metric->period->label());
+    }
+
+    #[Test]
+    public function a_product_without_orders_has_a_metric_of_zero(): void
     {
         $this->produkt('atemkurs', 'Atemkurs');
 
-        $this->assertNull($this->provider()->metric('atemkurs', $this->period()));
+        $metric = $this->provider()->metric('atemkurs', $this->period());
+
+        $this->assertNotNull($metric);
+        $this->assertSame(0, $metric->value);
+    }
+
+    #[Test]
+    public function an_unknown_product_has_no_metric(): void
+    {
         $this->assertNull($this->provider()->metric('nicht-da', $this->period()));
     }
 
@@ -145,6 +224,6 @@ class ProductMapObjectsTest extends TestCase
 
         $this->assertSame('found', $registry->lookup('product', 'atemkurs')->status);
         $this->assertSame('missing', $registry->lookup('product', 'nicht-da')->status);
-        $this->assertNull($registry->metric('product', 'atemkurs', $this->period()));
+        $this->assertSame(0, $registry->metric('product', 'atemkurs', $this->period())->value);
     }
 }
