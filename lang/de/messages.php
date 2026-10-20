@@ -233,5 +233,8 @@ return [
     'map_type_label' => 'Produkt',
     'map_metric_orders' => 'Bezahlte Bestellungen',
     'map_detail_price' => 'Preis',
+    'map_detail_period' => 'letzte :days Tage',
+    'map_decimal_point' => ',',
+    'map_thousands_separator' => '.',
     'map_detail_orders' => 'Bezahlte Bestellungen (:period)',
 ];

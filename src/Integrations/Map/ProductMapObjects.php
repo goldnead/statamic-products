@@ -8,6 +8,7 @@ use Goldnead\BrandContext\Map\MapObject;
 use Goldnead\BrandContext\Map\MapPeriod;
 use Goldnead\StatamicPayments\Models\Payment;
 use Goldnead\StatamicPayments\Support\Brands;
+use Goldnead\StatamicPayments\Support\Money;
 use Goldnead\StatamicProducts\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -111,7 +112,7 @@ class ProductMapObjects implements ProvidesMapObjects
             return null;
         }
 
-        $price = $product->amount().' '.$product->currency();
+        $price = $this->money((int) $product->amount_cent, $product->currency());
         $interval = is_string($product->interval) ? trim($product->interval) : '';
 
         if ($interval !== '') {
@@ -124,13 +125,30 @@ class ProductMapObjects implements ProvidesMapObjects
 
         if (Schema::hasTable('payments')) {
             $rows[] = [
-                'label' => __('statamic-products::messages.map_detail_orders', ['period' => $period->label()]),
+                'label' => __('statamic-products::messages.map_detail_orders', ['period' => __('statamic-products::messages.map_detail_period', ['days' => $period->days])]),
                 'value' => (string) $this->paidOrders($id, $period),
                 'href' => null,
             ];
         }
 
         return [['kind' => 'facts', 'title' => null, 'rows' => $rows]];
+    }
+
+    /**
+     * The price the way the CP language writes it, "1.199,00 EUR" in German.
+     * The same wording and separators as statamic-offers' panel, from the
+     * addon's own lang files; the decimals per currency come from payments.
+     */
+    protected function money(int $cent, string $currency): string
+    {
+        $decimals = Money::decimals($currency);
+
+        return number_format(
+            $cent / (10 ** $decimals),
+            $decimals,
+            __('statamic-products::messages.map_decimal_point'),
+            __('statamic-products::messages.map_thousands_separator'),
+        ).' '.$currency;
     }
 
     /** Paid orders for the handle in the period; the one counting rule of the card and the panel. */

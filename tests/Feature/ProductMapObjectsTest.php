@@ -267,6 +267,19 @@ class ProductMapObjectsTest extends TestCase
     }
 
     #[Test]
+    public function details_speak_german_in_a_german_cp(): void
+    {
+        app()->setLocale('de');
+        $this->produkt('atemkurs', 'Atemkurs', ['amount_cent' => 119900]);
+
+        $rows = $this->provider()->details('atemkurs', $this->period())[0]['rows'];
+
+        $this->assertSame('Preis', $rows[0]['label']);
+        $this->assertSame('1.199,00 EUR', $rows[0]['value']);
+        $this->assertSame('Bezahlte Bestellungen (letzte 30 Tage)', $rows[1]['label']);
+    }
+
+    #[Test]
     public function details_of_an_unknown_product_are_null(): void
     {
         $this->assertNull($this->provider()->details('nicht-da', $this->period()));
