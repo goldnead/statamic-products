@@ -130,9 +130,6 @@ class ServiceProvider extends AddonServiceProvider
     public function bootAddon()
     {
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'statamic-products');
-        // One key, `last :days days`: the funnels map's period wording comes
-        // from brand-context's MapPeriod without a German line of its own.
-        $this->loadJsonTranslationsFrom(__DIR__.'/../lang');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         $this->bootUtilities();

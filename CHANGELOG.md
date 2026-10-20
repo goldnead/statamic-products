@@ -14,10 +14,6 @@ brand-context 1.20 asks the provider before it serves the panel. The answer is y
 
 The map's price line is written like the CP writes numbers: `199,00 €` in German (non-breaking space), `€199.00` in English, a currency code with a space (`CHF 199.00`) where there is no symbol. It was `199.00 EUR`.
 
-### Fixed: the period reads in the CP language
-
-The card's period read "last 30 days" in a German CP. The addon now ships `lang/de.json` with "letzte 30 Tage".
-
 ## 1.15.0 — 2026-10-20
 
 ### Added: `ProductMapObjects::productsGranting($slug)`

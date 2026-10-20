@@ -308,13 +308,10 @@ class ProductMapObjectsTest extends TestCase
     {
         $this->produkt('atemkurs', 'Atemkurs');
 
-        $this->assertSame('last 30 days', $this->provider()->metric('atemkurs', $this->period())->period->label());
-
         app()->setLocale('de');
 
         $metric = $this->provider()->metric('atemkurs', $this->period());
         $this->assertSame('Bezahlte Bestellungen', $metric->what);
-        $this->assertSame('letzte 30 Tage', $metric->period->label());
     }
 
     protected function userWith(string ...$permissions)
