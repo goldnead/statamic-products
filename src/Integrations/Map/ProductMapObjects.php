@@ -94,10 +94,11 @@ class ProductMapObjects implements ProvidesMapObjects
 
     /**
      * Optional detail blocks for the map's side panel (Landkarte v4 part 3):
-     * one facts block with the price and the paid orders of the period. The
-     * orders are the same count as {@see metric()}, a number of orders and
-     * never a sum of money, so mixed currencies are not added. Without a
-     * payments table only the price row is shown. Null for an unknown product.
+     * one facts block with what the panel's head and the card do not already
+     * say. The head carries the price ({@see toMapObject()}), the card the paid
+     * orders ({@see metric()}); so neither is repeated here. What is left is the
+     * billing interval and the access the purchase grants. Null for an unknown
+     * product, and null when there is nothing more to say.
      *
      * @return list<array<string, mixed>>|null
      */
@@ -112,43 +113,80 @@ class ProductMapObjects implements ProvidesMapObjects
             return null;
         }
 
-        $price = $this->money((int) $product->amount_cent, $product->currency());
+        $rows = [];
         $interval = is_string($product->interval) ? trim($product->interval) : '';
 
         if ($interval !== '') {
-            $price .= ' / '.$interval;
-        }
-
-        $rows = [
-            ['label' => __('statamic-products::messages.map_detail_price'), 'value' => Str::limit($price, 120), 'href' => null],
-        ];
-
-        if (Schema::hasTable('payments')) {
             $rows[] = [
-                'label' => __('statamic-products::messages.map_detail_orders', ['period' => __('statamic-products::messages.map_detail_period', ['days' => $period->days])]),
-                'value' => (string) $this->paidOrders($id, $period),
+                'label' => __('statamic-products::messages.map_detail_interval'),
+                'value' => Str::limit($interval, 120),
                 'href' => null,
             ];
         }
 
-        return [['kind' => 'facts', 'title' => null, 'rows' => $rows]];
+        $grants = $product->grantSlugs();
+
+        if ($grants !== []) {
+            $rows[] = [
+                'label' => __('statamic-products::messages.map_detail_grants'),
+                'value' => Str::limit(implode(', ', $grants), 120),
+                'href' => null,
+            ];
+        }
+
+        return $rows === [] ? null : [['kind' => 'facts', 'title' => null, 'rows' => $rows]];
     }
 
     /**
-     * The price the way the CP language writes it, "1.199,00 EUR" in German.
-     * The same wording and separators as statamic-offers' panel, from the
-     * addon's own lang files; the decimals per currency come from payments.
+     * The panel shows the price and the paid orders, so only a user who may
+     * see payments in the CP may open it. Without a payments table there is
+     * nothing sold to hide and the product screen's own permission decides.
+     * Fail closed: no user, or one that cannot answer, is a no.
+     *
+     * The permission is the one statamic-payments puts on its Payments utility
+     * (`->can('access payments utility')` in its service provider).
+     */
+    public function detailsAuthorized(string $id, $user): bool
+    {
+        if ($user === null || ! method_exists($user, 'can')) {
+            return false;
+        }
+
+        $permission = Schema::hasTable('payments') ? 'access payments utility' : 'access products utility';
+
+        try {
+            return $user->can($permission) === true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * The price the way the CP language writes it: "199,00 €" in German, "€199.00"
+     * in English; a currency without a symbol keeps its code ("SEK 199.00").
+     * Separators and the order of number and symbol come from the lang files;
+     * the decimals per currency from payments.
      */
     protected function money(int $cent, string $currency): string
     {
         $decimals = Money::decimals($currency);
+        $symbol = Money::symbol($currency);
+        $format = (string) __('statamic-products::messages.map_money_format');
 
-        return number_format(
-            $cent / (10 ** $decimals),
-            $decimals,
-            __('statamic-products::messages.map_decimal_point'),
-            __('statamic-products::messages.map_thousands_separator'),
-        ).' '.$currency;
+        // A code ("CHF") is a word, not a sign: it needs its space in front of the number.
+        if (preg_match('/\pL/u', $symbol) === 1 && str_starts_with($format, ':symbol:')) {
+            $format = ':symbol :'.substr($format, 8);
+        }
+
+        return strtr($format, [
+            ':amount' => number_format(
+                $cent / (10 ** $decimals),
+                $decimals,
+                __('statamic-products::messages.map_decimal_point'),
+                __('statamic-products::messages.map_thousands_separator'),
+            ),
+            ':symbol' => $symbol,
+        ]);
     }
 
     /** Paid orders for the handle in the period; the one counting rule of the card and the panel. */
@@ -210,7 +248,7 @@ class ProductMapObjects implements ProvidesMapObjects
             label: (string) $product->name,
             cpUrl: cp_route('utilities.products.show', $product->id),
             enabled: (bool) $product->active,
-            detail: $product->amount().' '.$product->currency(),
+            detail: $this->money((int) $product->amount_cent, $product->currency()),
         );
     }
 }

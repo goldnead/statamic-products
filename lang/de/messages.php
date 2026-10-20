@@ -232,9 +232,10 @@ return [
     'form_errors' => 'Speichern hat nicht geklappt. Die markierten Tabs und Felder zeigen, was fehlt.',
     'map_type_label' => 'Produkt',
     'map_metric_orders' => 'Bezahlte Bestellungen',
-    'map_detail_price' => 'Preis',
-    'map_detail_period' => 'letzte :days Tage',
+    'map_detail_interval' => 'Abrechnungsintervall',
+    'map_detail_grants' => 'Gewährt Zugang zu',
     'map_decimal_point' => ',',
     'map_thousands_separator' => '.',
-    'map_detail_orders' => 'Bezahlte Bestellungen (:period)',
+    // Zahl vor dem Zeichen, mit geschütztem Leerzeichen (U+00A0).
+    'map_money_format' => ":amount\u{00A0}:symbol",
 ];

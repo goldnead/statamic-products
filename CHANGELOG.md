@@ -4,7 +4,19 @@
 
 ### Added: `ProductMapObjects::details()`
 
-The funnels map's side panel shows the product's price (with currency and, for a recurring price, the interval) and the paid orders of the period. The orders use the same counting rule as the card's number (one shared query); it is a count, never a sum across currencies. Without a payments table only the price row appears.
+The funnels map's side panel shows what the panel's head and the card do not already say: the billing interval and the access the product grants. Nothing is repeated: the head (`MapObject::detail`) carries the price once, the card (`metric()`) the paid orders of the period once. `details()` returns null when there is nothing more to say.
+
+### Added: `ProductMapObjects::detailsAuthorized()`
+
+brand-context 1.20 asks the provider before it serves the panel. The answer is yes for a user with `access payments utility` (the permission that shows orders and payments in the CP), or with `access products utility` when the payments table is missing. No user, or one that cannot answer, is a no. The panel needs brand-context 1.20; on 1.19 it stays empty.
+
+### Changed: the price reads in the CP language
+
+The map's price line is written like the CP writes numbers: `199,00 €` in German (non-breaking space), `€199.00` in English, a currency code with a space (`CHF 199.00`) where there is no symbol. It was `199.00 EUR`.
+
+### Fixed: the period reads in the CP language
+
+The card's period read "last 30 days" in a German CP. The addon now ships `lang/de.json` with "letzte 30 Tage".
 
 ## 1.15.0 — 2026-10-20
 
