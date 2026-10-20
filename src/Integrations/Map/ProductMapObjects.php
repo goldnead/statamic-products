@@ -108,6 +108,35 @@ class ProductMapObjects implements ProvidesMapObjects
         );
     }
 
+    /**
+     * The handles of the products whose purchase grants the entitlement slug,
+     * sorted. This is how another addon (automations) draws "this product
+     * triggers that automation" when the automation listens to the grant and
+     * not to the product handle. The answer is computed from the catalogue on
+     * every call and never stored. Uses {@see Product::grantSlugs()}, the same
+     * list the checkout hands to the entitlements bridge.
+     *
+     * @return list<string>
+     */
+    public function productsGranting(string $slug): array
+    {
+        $slug = trim($slug);
+
+        if ($slug === '') {
+            return [];
+        }
+
+        return Product::query()
+            ->forBrand()
+            ->whereNotNull('grants')
+            ->orderBy('handle')
+            ->get()
+            ->filter(fn (Product $product) => in_array($slug, $product->grantSlugs(), true))
+            ->map(fn (Product $product) => (string) $product->handle)
+            ->values()
+            ->all();
+    }
+
     protected function toMapObject(Product $product): MapObject
     {
         return new MapObject(
