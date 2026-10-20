@@ -232,4 +232,6 @@ return [
     'form_errors' => 'Speichern hat nicht geklappt. Die markierten Tabs und Felder zeigen, was fehlt.',
     'map_type_label' => 'Produkt',
     'map_metric_orders' => 'Bezahlte Bestellungen',
+    'map_detail_price' => 'Preis',
+    'map_detail_orders' => 'Bezahlte Bestellungen (:period)',
 ];

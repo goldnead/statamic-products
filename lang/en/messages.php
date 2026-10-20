@@ -232,4 +232,6 @@ return [
     'form_errors' => 'Saving did not work. The marked tabs and fields show what is missing.',
     'map_type_label' => 'Product',
     'map_metric_orders' => 'Paid orders',
+    'map_detail_price' => 'Price',
+    'map_detail_orders' => 'Paid orders (:period)',
 ];

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added: `ProductMapObjects::details()`
+
+The funnels map's side panel shows the product's price (with currency and, for a recurring price, the interval) and the paid orders of the period. The orders use the same counting rule as the card's number (one shared query); it is a count, never a sum across currencies. Without a payments table only the price row appears.
+
 ## 1.15.0 — 2026-10-20
 
 ### Added: `ProductMapObjects::productsGranting($slug)`

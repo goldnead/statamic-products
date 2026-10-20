@@ -11,6 +11,7 @@ use Goldnead\StatamicProducts\Integrations\Map\ProductMapObjects;
 use Goldnead\StatamicProducts\Models\Product;
 use Goldnead\StatamicProducts\Tests\TestCase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
@@ -206,6 +207,69 @@ class ProductMapObjectsTest extends TestCase
     public function an_unknown_product_has_no_metric(): void
     {
         $this->assertNull($this->provider()->metric('nicht-da', $this->period()));
+    }
+
+    #[Test]
+    public function details_show_the_price_and_the_paid_orders_of_the_period(): void
+    {
+        $this->produkt('atemkurs', 'Atemkurs', ['amount_cent' => 4900]);
+        $this->produkt('chorstimme', 'Chorstimme');
+
+        $this->order(['atemkurs']);
+        $this->order(['chorstimme', 'atemkurs']);
+        $this->order([], ['product' => 'atemkurs']);
+        $this->order(['atemkurs'], ['status' => Payment::STATUS_OPEN]);
+        $this->order(['atemkurs'], ['paid_at' => Carbon::now()->subDays(60)]);
+        // Another currency is still one order: the count never adds money.
+        $this->order(['atemkurs'], ['currency' => 'USD']);
+
+        $details = $this->provider()->details('atemkurs', $this->period());
+
+        $this->assertCount(1, $details);
+        $this->assertSame('facts', $details[0]['kind']);
+        $this->assertSame([
+            ['label' => 'Price', 'value' => '49.00 EUR', 'href' => null],
+            ['label' => 'Paid orders (last 30 days)', 'value' => '4', 'href' => null],
+        ], $details[0]['rows']);
+
+        // The same rule as the card.
+        $this->assertSame(
+            $this->provider()->metric('atemkurs', $this->period())->value,
+            (int) $details[0]['rows'][1]['value'],
+        );
+    }
+
+    #[Test]
+    public function details_name_the_interval_of_a_recurring_price(): void
+    {
+        $this->produkt('abo', 'Abo', ['interval' => '1 month', 'amount_cent' => 1900]);
+
+        $rows = $this->provider()->details('abo', $this->period())[0]['rows'];
+
+        $this->assertSame('19.00 EUR / 1 month', $rows[0]['value']);
+        $this->assertSame('0', $rows[1]['value']);
+    }
+
+    #[Test]
+    public function details_show_only_the_price_when_the_payments_table_is_missing(): void
+    {
+        $this->produkt('atemkurs', 'Atemkurs');
+        // Renamed, not dropped, so the migrations can still roll back in teardown.
+        Schema::rename('payments', 'payments_away');
+
+        try {
+            $rows = $this->provider()->details('atemkurs', $this->period())[0]['rows'];
+        } finally {
+            Schema::rename('payments_away', 'payments');
+        }
+
+        $this->assertSame([['label' => 'Price', 'value' => '29.00 EUR', 'href' => null]], $rows);
+    }
+
+    #[Test]
+    public function details_of_an_unknown_product_are_null(): void
+    {
+        $this->assertNull($this->provider()->details('nicht-da', $this->period()));
     }
 
     #[Test]

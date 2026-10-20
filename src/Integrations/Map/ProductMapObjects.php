@@ -12,6 +12,7 @@ use Goldnead\StatamicProducts\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * Products as objects the funnels map can point at.
@@ -83,9 +84,61 @@ class ProductMapObjects implements ProvidesMapObjects
             return null;
         }
 
+        return new MapMetric(
+            $this->paidOrders($id, $period),
+            __('statamic-products::messages.map_metric_orders'),
+            $period,
+        );
+    }
+
+    /**
+     * Optional detail blocks for the map's side panel (Landkarte v4 part 3):
+     * one facts block with the price and the paid orders of the period. The
+     * orders are the same count as {@see metric()}, a number of orders and
+     * never a sum of money, so mixed currencies are not added. Without a
+     * payments table only the price row is shown. Null for an unknown product.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    public function details(string $id, MapPeriod $period): ?array
+    {
+        $product = Product::query()
+            ->forBrand()
+            ->where('handle', $id)
+            ->first();
+
+        if ($product === null) {
+            return null;
+        }
+
+        $price = $product->amount().' '.$product->currency();
+        $interval = is_string($product->interval) ? trim($product->interval) : '';
+
+        if ($interval !== '') {
+            $price .= ' / '.$interval;
+        }
+
+        $rows = [
+            ['label' => __('statamic-products::messages.map_detail_price'), 'value' => Str::limit($price, 120), 'href' => null],
+        ];
+
+        if (Schema::hasTable('payments')) {
+            $rows[] = [
+                'label' => __('statamic-products::messages.map_detail_orders', ['period' => $period->label()]),
+                'value' => (string) $this->paidOrders($id, $period),
+                'href' => null,
+            ];
+        }
+
+        return [['kind' => 'facts', 'title' => null, 'rows' => $rows]];
+    }
+
+    /** Paid orders for the handle in the period; the one counting rule of the card and the panel. */
+    protected function paidOrders(string $id, MapPeriod $period): int
+    {
         $now = Carbon::now();
 
-        $orders = Brands::only(Payment::query(), Brands::readerId())
+        return (int) Brands::only(Payment::query(), Brands::readerId())
             ->where('status', Payment::STATUS_PAID)
             ->whereNotNull('paid_at')
             ->where('paid_at', '>=', $period->from)
@@ -100,12 +153,6 @@ class ProductMapObjects implements ProvidesMapObjects
                     ->whereNotExists(fn ($line) => $line->from('payment_items')
                         ->whereColumn('payment_items.payment_id', 'payments.id'))))
             ->count();
-
-        return new MapMetric(
-            (int) $orders,
-            __('statamic-products::messages.map_metric_orders'),
-            $period,
-        );
     }
 
     /**
