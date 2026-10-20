@@ -226,4 +226,20 @@ class ProductMapObjectsTest extends TestCase
         $this->assertSame('missing', $registry->lookup('product', 'nicht-da')->status);
         $this->assertSame(0, $registry->metric('product', 'atemkurs', $this->period())->value);
     }
+
+    #[Test]
+    public function it_names_the_products_that_grant_a_slug(): void
+    {
+        $this->produkt('masterclass-vokale-aussprache', 'Masterclass', ['grants' => ['kurs-vokale-aussprache', 'bonus']]);
+        $this->produkt('bundle', 'Bundle', ['grants' => ['kurs-vokale-aussprache']]);
+        $this->produkt('anderes', 'Anderes', ['grants' => ['etwas-anderes']]);
+        $this->produkt('ohne', 'Ohne Gewaehr');
+
+        $this->assertSame(
+            ['bundle', 'masterclass-vokale-aussprache'],
+            $this->provider()->productsGranting('kurs-vokale-aussprache'),
+        );
+        $this->assertSame([], $this->provider()->productsGranting('nichts'));
+        $this->assertSame([], $this->provider()->productsGranting(''));
+    }
 }

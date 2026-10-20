@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added: `ProductMapObjects::productsGranting($slug)`
+
+Names the products whose purchase grants an entitlement slug. The funnels map uses it (via statamic-automations) to draw a product to an automation that listens to the grant, not to the product handle. Computed on demand, nothing stored.
+
 ## 1.14.0 — 2026-10-19
 
 Minor: the product card on the funnels map shows a number.
