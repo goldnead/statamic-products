@@ -8,10 +8,12 @@ use Goldnead\BrandContext\Map\MapObject;
 use Goldnead\BrandContext\Map\MapPeriod;
 use Goldnead\StatamicPayments\Models\Payment;
 use Goldnead\StatamicPayments\Support\Brands;
+use Goldnead\StatamicPayments\Support\Money;
 use Goldnead\StatamicProducts\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * Products as objects the funnels map can point at.
@@ -83,9 +85,117 @@ class ProductMapObjects implements ProvidesMapObjects
             return null;
         }
 
+        return new MapMetric(
+            $this->paidOrders($id, $period),
+            __('statamic-products::messages.map_metric_orders'),
+            $period,
+        );
+    }
+
+    /**
+     * Optional detail blocks for the map's side panel (Landkarte v4 part 3):
+     * one facts block with what the panel's head and the card do not already
+     * say. The head carries the price ({@see toMapObject()}), the card the paid
+     * orders ({@see metric()}); so neither is repeated here. What is left is the
+     * billing interval and the access the purchase grants. Null for an unknown
+     * product, and null when there is nothing more to say.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    public function details(string $id, MapPeriod $period): ?array
+    {
+        $product = Product::query()
+            ->forBrand()
+            ->where('handle', $id)
+            ->first();
+
+        if ($product === null) {
+            return null;
+        }
+
+        $rows = [];
+        $interval = is_string($product->interval) ? trim($product->interval) : '';
+
+        if ($interval !== '') {
+            $rows[] = [
+                'label' => __('statamic-products::messages.map_detail_interval'),
+                'value' => Str::limit($interval, 120),
+                'href' => null,
+            ];
+        }
+
+        $grants = $product->grantSlugs();
+
+        if ($grants !== []) {
+            $rows[] = [
+                'label' => __('statamic-products::messages.map_detail_grants'),
+                'value' => Str::limit(implode(', ', $grants), 120),
+                'href' => null,
+            ];
+        }
+
+        return $rows === [] ? null : [['kind' => 'facts', 'title' => null, 'rows' => $rows]];
+    }
+
+    /**
+     * The panel shows the price and the paid orders, so only a user who may
+     * see payments in the CP may open it. Without a payments table there is
+     * nothing sold to hide and the product screen's own permission decides.
+     * Fail closed: no user, or one that cannot answer, is a no.
+     *
+     * The permission is the one statamic-payments puts on its Payments utility
+     * (`->can('access payments utility')` in its service provider).
+     */
+    public function detailsAuthorized(string $id, $user): bool
+    {
+        if ($user === null || ! method_exists($user, 'can')) {
+            return false;
+        }
+
+        $permission = Schema::hasTable('payments') ? 'access payments utility' : 'access products utility';
+
+        try {
+            return $user->can($permission) === true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * The price the way the CP language writes it: "199,00 €" in German, "€199.00"
+     * in English; a currency without a symbol keeps its code ("SEK 199.00").
+     * Separators and the order of number and symbol come from the lang files;
+     * the decimals per currency from payments.
+     */
+    protected function money(int $cent, string $currency): string
+    {
+        $decimals = Money::decimals($currency);
+        // Not Money::symbol(): the payments versions this addon allows do not all have it.
+        $symbol = ['EUR' => '€', 'USD' => '$', 'GBP' => '£'][strtoupper($currency)] ?? $currency;
+        $format = (string) __('statamic-products::messages.map_money_format');
+
+        // A code ("CHF") is a word, not a sign: it needs its space in front of the number.
+        if (preg_match('/\pL/u', $symbol) === 1 && str_starts_with($format, ':symbol:')) {
+            $format = ':symbol :'.substr($format, 8);
+        }
+
+        return strtr($format, [
+            ':amount' => number_format(
+                $cent / (10 ** $decimals),
+                $decimals,
+                __('statamic-products::messages.map_decimal_point'),
+                __('statamic-products::messages.map_thousands_separator'),
+            ),
+            ':symbol' => $symbol,
+        ]);
+    }
+
+    /** Paid orders for the handle in the period; the one counting rule of the card and the panel. */
+    protected function paidOrders(string $id, MapPeriod $period): int
+    {
         $now = Carbon::now();
 
-        $orders = Brands::only(Payment::query(), Brands::readerId())
+        return (int) Brands::only(Payment::query(), Brands::readerId())
             ->where('status', Payment::STATUS_PAID)
             ->whereNotNull('paid_at')
             ->where('paid_at', '>=', $period->from)
@@ -100,12 +210,6 @@ class ProductMapObjects implements ProvidesMapObjects
                     ->whereNotExists(fn ($line) => $line->from('payment_items')
                         ->whereColumn('payment_items.payment_id', 'payments.id'))))
             ->count();
-
-        return new MapMetric(
-            (int) $orders,
-            __('statamic-products::messages.map_metric_orders'),
-            $period,
-        );
     }
 
     /**
@@ -145,7 +249,7 @@ class ProductMapObjects implements ProvidesMapObjects
             label: (string) $product->name,
             cpUrl: cp_route('utilities.products.show', $product->id),
             enabled: (bool) $product->active,
-            detail: $product->amount().' '.$product->currency(),
+            detail: $this->money((int) $product->amount_cent, $product->currency()),
         );
     }
 }

@@ -232,4 +232,10 @@ return [
     'form_errors' => 'Saving did not work. The marked tabs and fields show what is missing.',
     'map_type_label' => 'Product',
     'map_metric_orders' => 'Paid orders',
+    'map_detail_interval' => 'Billing interval',
+    'map_detail_grants' => 'Grants access to',
+    'map_decimal_point' => '.',
+    'map_thousands_separator' => ',',
+    // Symbol before the amount; a currency code gets a space (see ProductMapObjects::money()).
+    'map_money_format' => ':symbol:amount',
 ];

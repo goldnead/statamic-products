@@ -11,7 +11,11 @@ use Goldnead\StatamicProducts\Integrations\Map\ProductMapObjects;
 use Goldnead\StatamicProducts\Models\Product;
 use Goldnead\StatamicProducts\Tests\TestCase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
+use Statamic\Facades\Permission;
+use Statamic\Facades\Role;
+use Statamic\Facades\User;
 
 /**
  * Products as objects for the funnels map (brand-context 1.17).
@@ -104,7 +108,6 @@ class ProductMapObjectsTest extends TestCase
         $this->assertSame('atemkurs', $object->id);
         $this->assertSame('Atemkurs', $object->label);
         $this->assertSame(true, $object->enabled);
-        $this->assertSame('49.00 EUR', $object->detail);
         $this->assertStringEndsWith('/utilities/products/'.Product::query()->where('handle', 'atemkurs')->value('id'), $object->cpUrl);
     }
 
@@ -206,6 +209,157 @@ class ProductMapObjectsTest extends TestCase
     public function an_unknown_product_has_no_metric(): void
     {
         $this->assertNull($this->provider()->metric('nicht-da', $this->period()));
+    }
+
+    #[Test]
+    public function details_repeat_neither_the_price_nor_the_order_count_of_the_header_and_the_card(): void
+    {
+        $this->produkt('atemkurs', 'Atemkurs', ['amount_cent' => 4900, 'interval' => '1 month', 'grants' => ['kurs-atem', 'bonus']]);
+        $this->order(['atemkurs']);
+
+        $object = $this->provider()->find('atemkurs');
+        $metric = $this->provider()->metric('atemkurs', $this->period());
+        $details = $this->provider()->details('atemkurs', $this->period());
+
+        // The header carries the price once, the card the orders once.
+        $this->assertSame('€49.00', $object->detail);
+        $this->assertSame(1, $metric->value);
+
+        $this->assertCount(1, $details);
+        $this->assertSame('facts', $details[0]['kind']);
+        $this->assertSame([
+            ['label' => 'Billing interval', 'value' => '1 month', 'href' => null],
+            ['label' => 'Grants access to', 'value' => 'kurs-atem, bonus', 'href' => null],
+        ], $details[0]['rows']);
+
+        foreach ($details[0]['rows'] as $row) {
+            $this->assertStringNotContainsString('49', $row['value']);
+            $this->assertStringNotContainsStringIgnoringCase('price', $row['label']);
+            $this->assertStringNotContainsStringIgnoringCase('orders', $row['label']);
+        }
+    }
+
+    #[Test]
+    public function details_are_null_when_the_header_and_the_card_already_say_everything(): void
+    {
+        $this->produkt('atemkurs', 'Atemkurs');
+
+        $this->assertNull($this->provider()->details('atemkurs', $this->period()));
+    }
+
+    #[Test]
+    public function details_show_only_the_rows_that_exist(): void
+    {
+        $this->produkt('abo', 'Abo', ['interval' => '1 month']);
+        $this->produkt('kurs', 'Kurs', ['grants' => ['kurs-atem']]);
+
+        $this->assertSame(
+            [['label' => 'Billing interval', 'value' => '1 month', 'href' => null]],
+            $this->provider()->details('abo', $this->period())[0]['rows'],
+        );
+        $this->assertSame(
+            [['label' => 'Grants access to', 'value' => 'kurs-atem', 'href' => null]],
+            $this->provider()->details('kurs', $this->period())[0]['rows'],
+        );
+    }
+
+    #[Test]
+    public function details_speak_german_in_a_german_cp(): void
+    {
+        app()->setLocale('de');
+        $this->produkt('abo', 'Abo', ['interval' => '1 month', 'grants' => ['kurs-atem']]);
+
+        $rows = $this->provider()->details('abo', $this->period())[0]['rows'];
+
+        $this->assertSame('Abrechnungsintervall', $rows[0]['label']);
+        $this->assertSame('Gewährt Zugang zu', $rows[1]['label']);
+    }
+
+    #[Test]
+    public function details_of_an_unknown_product_are_null(): void
+    {
+        $this->assertNull($this->provider()->details('nicht-da', $this->period()));
+    }
+
+    #[Test]
+    public function the_price_is_written_the_way_the_cp_language_writes_it(): void
+    {
+        $nbsp = "\u{00A0}";
+        $this->produkt('teuer', 'Teuer', ['amount_cent' => 119900]);
+        $this->produkt('dollar', 'Dollar', ['amount_cent' => 19900, 'currency' => 'USD']);
+        $this->produkt('franken', 'Franken', ['amount_cent' => 19900, 'currency' => 'CHF']);
+        $this->produkt('krone', 'Krone', ['amount_cent' => 19900, 'currency' => 'SEK']);
+
+        $this->assertSame('€1,199.00', $this->provider()->find('teuer')->detail);
+        $this->assertSame('$199.00', $this->provider()->find('dollar')->detail);
+        $this->assertSame('CHF 199.00', $this->provider()->find('franken')->detail);
+        $this->assertSame('SEK 199.00', $this->provider()->find('krone')->detail);
+
+        app()->setLocale('de');
+
+        $this->assertSame("1.199,00{$nbsp}€", $this->provider()->find('teuer')->detail);
+        $this->assertSame("199,00{$nbsp}\$", $this->provider()->find('dollar')->detail);
+        $this->assertSame("199,00{$nbsp}CHF", $this->provider()->find('franken')->detail);
+        $this->assertSame("199,00{$nbsp}SEK", $this->provider()->find('krone')->detail);
+    }
+
+    #[Test]
+    public function the_period_reads_in_the_cp_language(): void
+    {
+        $this->produkt('atemkurs', 'Atemkurs');
+
+        app()->setLocale('de');
+
+        $metric = $this->provider()->metric('atemkurs', $this->period());
+        $this->assertSame('Bezahlte Bestellungen', $metric->what);
+    }
+
+    protected function userWith(string ...$permissions)
+    {
+        static $n = 0;
+        // Utilities register their `access … utility` permission on a CP
+        // request; the gate for it has to exist for `can()` to answer.
+        foreach (['access payments utility', 'access products utility'] as $permission) {
+            Permission::register($permission);
+        }
+        $role = tap(Role::make('rolle-'.++$n)->addPermission('access cp'))->save();
+        foreach ($permissions as $permission) {
+            $role->addPermission($permission);
+        }
+        $role->save();
+
+        return tap(User::make()->email("u{$n}@example.com")->assignRole($role))->save();
+    }
+
+    #[Test]
+    public function details_are_allowed_with_the_payments_permission_when_payments_exist(): void
+    {
+        $this->assertFalse($this->provider()->detailsAuthorized('atemkurs', null));
+        $this->assertFalse($this->provider()->detailsAuthorized('atemkurs', $this->userWith()));
+        // The product permission alone does not show sales.
+        $this->assertFalse($this->provider()->detailsAuthorized('atemkurs', $this->userWith('access products utility')));
+        $this->assertTrue($this->provider()->detailsAuthorized('atemkurs', $this->userWith('access payments utility')));
+        $this->assertTrue($this->provider()->detailsAuthorized('atemkurs', tap(User::make()->email('s@example.com')->makeSuper())->save()));
+    }
+
+    #[Test]
+    public function details_fall_back_to_the_product_permission_without_a_payments_table(): void
+    {
+        Schema::rename('payments', 'payments_away');
+
+        try {
+            $this->assertFalse($this->provider()->detailsAuthorized('atemkurs', null));
+            $this->assertFalse($this->provider()->detailsAuthorized('atemkurs', $this->userWith('access payments utility')));
+            $this->assertTrue($this->provider()->detailsAuthorized('atemkurs', $this->userWith('access products utility')));
+        } finally {
+            Schema::rename('payments_away', 'payments');
+        }
+    }
+
+    #[Test]
+    public function details_authorization_fails_closed_for_a_user_that_cannot_answer(): void
+    {
+        $this->assertFalse($this->provider()->detailsAuthorized('atemkurs', new \stdClass));
     }
 
     #[Test]
