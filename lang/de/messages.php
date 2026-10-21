@@ -238,4 +238,10 @@ return [
     'map_thousands_separator' => '.',
     // Zahl vor dem Zeichen, mit geschütztem Leerzeichen (U+00A0).
     'map_money_format' => ":amount\u{00A0}:symbol",
+    'sim_missing' => 'Das Produkt gibt es nicht (mehr). Es würde nichts passieren.',
+    'sim_inactive' => 'Nicht aktiv: es lässt sich nicht kaufen',
+    'sim_checkout' => 'Kaufabwicklung',
+    'sim_checkout_detail' => 'Zahlung, Rechnung und Bestätigungsmail gehören nicht zum Probelauf',
+    'sim_access' => 'Zugang :slug wird gewährt',
+    'sim_granted' => 'Der Kauf von :product gewährt Zugang; verbundene Automationen und Freischaltungen reagieren darauf',
 ];
