@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.17.0 — 2026-10-21
+
 ### Added: dry run of a product (`paths()`, `react()`, `simulationAuthorized()`)
 
 The funnels map's Probelauf asks a product what it would do when it is bought: a checkout line, one access line per grant, and the grant event for the connected automations. Nothing is charged, invoiced, sent or granted. An inactive product stops the path, an unknown one is answered as unknown. `simulationAuthorized()` is the same permission as the panel details. Needs statamic-brand-context with the simulation classes; the trait is `SimulatesProduct`.
