@@ -18,13 +18,13 @@
     "laravel/pint": "^1.18",
     "orchestra/testbench": "^10.0 || ^11.0",
     "phpunit/phpunit": "^11.0 || ^12.0",
-    "goldnead/statamic-brand-context": "^1.18",
+    "goldnead/statamic-brand-context": "^1.21",
     "goldnead/statamic-events": "*",
     "goldnead/statamic-booking": "*",
     "goldnead/statamic-entitlements": "^1.4"
   },
   "suggest": {
-    "goldnead/statamic-brand-context": "Show products as cards on the funnels map (1.17 or later).",
+    "goldnead/statamic-brand-context": "^1.21",
     "goldnead/statamic-entitlements": "Grants on an access then also cover what it contains, nested accesses included (^1.4)."
   },
   "autoload": {
