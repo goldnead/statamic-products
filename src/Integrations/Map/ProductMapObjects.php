@@ -170,7 +170,8 @@ class ProductMapObjects implements ProvidesMapObjects
     protected function money(int $cent, string $currency): string
     {
         $decimals = Money::decimals($currency);
-        $symbol = Money::symbol($currency);
+        // Not Money::symbol(): the payments versions this addon allows do not all have it.
+        $symbol = ['EUR' => '€', 'USD' => '$', 'GBP' => '£'][strtoupper($currency)] ?? $currency;
         $format = (string) __('statamic-products::messages.map_money_format');
 
         // A code ("CHF") is a word, not a sign: it needs its space in front of the number.
