@@ -33,6 +33,8 @@ use Illuminate\Support\Str;
  */
 class ProductMapObjects implements ProvidesMapObjects
 {
+    use SimulatesProduct;
+
     public function type(): string
     {
         return 'product';

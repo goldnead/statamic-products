@@ -238,4 +238,10 @@ return [
     'map_thousands_separator' => ',',
     // Symbol before the amount; a currency code gets a space (see ProductMapObjects::money()).
     'map_money_format' => ':symbol:amount',
+    'sim_missing' => 'The product does not exist (or no longer). Nothing would happen.',
+    'sim_inactive' => 'Not active: it cannot be bought',
+    'sim_checkout' => 'Checkout',
+    'sim_checkout_detail' => 'Payment, invoice and confirmation mail do not belong to the dry run',
+    'sim_access' => 'Access :slug is granted',
+    'sim_granted' => 'The purchase of :product grants access; connected automations and unlocks react to it',
 ];
