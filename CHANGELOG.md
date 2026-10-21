@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.16.0 — 2026-10-21
+
 ### Added: `ProductMapObjects::details()`
 
 The funnels map's side panel shows what the panel's head and the card do not already say: the billing interval and the access the product grants. Nothing is repeated: the head (`MapObject::detail`) carries the price once, the card (`metric()`) the paid orders of the period once. `details()` returns null when there is nothing more to say.
