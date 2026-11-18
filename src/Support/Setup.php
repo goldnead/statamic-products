@@ -25,6 +25,51 @@ use Inertia\Response;
 final class Setup
 {
     /**
+     * `goldnead/statamic-brand-context` 1.27's route middleware for CP detail
+     * pages, as a class name, never an import: the package is a suggest, and a
+     * `use` of a class that is not installed is a fatal on the first page.
+     */
+    private const DETAIL_GUARD = 'Goldnead\BrandContext\Http\Middleware\GuardSetup';
+
+    /**
+     * Route middleware that shows this addon's setup screen on a detail page
+     * whose tables are missing, or nothing when brand-context (>= 1.27) is not
+     * installed. Without it the page behaves as it always did.
+     *
+     * @return list<string>
+     */
+    public static function detailGuard(string $title, string ...$tables): array
+    {
+        return self::detailGuardFrom(self::DETAIL_GUARD, $title, ...$tables);
+    }
+
+    /**
+     * {@see detailGuard()} with the middleware class named, so a test can ask
+     * what happens when it is not there. Not meant for anything else.
+     *
+     * @internal
+     *
+     * @param  class-string|string  $guard
+     * @return list<string>
+     */
+    public static function detailGuardFrom(string $guard, string $title, string ...$tables): array
+    {
+        if (! class_exists($guard) || ! method_exists($guard, 'using') || ! defined($guard.'::ALIAS')) {
+            return [];
+        }
+
+        // The class is in vendor, but the alias is the package's provider's to
+        // register. A route naming an alias nobody registered is an HTTP 500
+        // (Laravel reads it as a class name), so no alias means no middleware.
+        // Routes load after every provider has booted, so the answer is final.
+        if (! array_key_exists(constant($guard.'::ALIAS'), app('router')->getMiddleware())) {
+            return [];
+        }
+
+        return [$guard::using(self::class, $title, ...$tables)];
+    }
+
+    /**
      * The setup screen for a CP listing, or null when the page can run.
      *
      * @param  string  $title  The page's own heading, so the screen still reads as that page.
