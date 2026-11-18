@@ -253,6 +253,24 @@ class BrandContextGuardTest extends TestCase
         $this->actingAs($user)->getJson('/cp/utilities/products/'.$product->id)->assertForbidden();
     }
 
+    #[Test]
+    public function with_the_package_a_user_without_the_permission_does_not_see_the_access_setup_screen(): void
+    {
+        if (! $this->installed()) {
+            $this->markTestSkipped('goldnead/statamic-brand-context is not installed.');
+        }
+
+        $access = $this->access();
+        $this->hide('product_accesses');
+        $this->hide('products');
+
+        $role = tap(Role::make('nur-cp-zugang')->addPermission('access cp'))->save();
+        $user = tap(User::make()->email('ohne-recht-zugang@example.com')->assignRole($role))->save();
+
+        $this->actingAs($user)->get('/cp/utilities/product-accesses/'.$access->id)->assertRedirect();
+        $this->actingAs($user)->getJson('/cp/utilities/product-accesses/'.$access->id)->assertForbidden();
+    }
+
     /** Both legs: a migrated install renders the pages it always did. */
     #[Test]
     public function a_migrated_install_still_renders_the_product_page(): void
