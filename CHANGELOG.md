@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The Control Panel product page (`/cp/utilities/products/{product}`) and access page (`/cp/utilities/product-accesses/{access}`) now ask the setup guard of `goldnead/statamic-brand-context` 1.27 or newer first: on a database whose migrations have not run they show the same setup screen as the listings instead of an HTTP 500. brand-context stays optional (`suggest`); without it, or with an older version, the pages behave as before. No migration, no new config key.
+
 ## 1.17.1 — 2026-11-16
 
 ### Changed

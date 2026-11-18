@@ -17,6 +17,7 @@ use Goldnead\StatamicProducts\Models\Product;
 use Goldnead\StatamicProducts\Support\AccessGraph;
 use Goldnead\StatamicProducts\Support\AccessPackageResolver;
 use Goldnead\StatamicProducts\Support\GrantableAccesses;
+use Goldnead\StatamicProducts\Support\Setup;
 use Illuminate\Support\Facades\Log;
 use Statamic\Facades\CP\Nav;
 use Statamic\Facades\Utility;
@@ -286,7 +287,16 @@ class ServiceProvider extends AddonServiceProvider
                     // an earlier section, wins the breadcrumb and the highlight,
                     // and the create page then claims to be a utility.
                     $router->get('new', [ProductsController::class, 'create'])->name('create');
-                    $router->get('{product}', [ProductsController::class, 'show'])->name('show')->whereNumber('product');
+                    // The detail page reads `products` inside the controller, after
+                    // the auth check, so without the table it is a 500. The guard
+                    // runs first when brand-context (>= 1.27) is installed.
+                    $router->get('{product}', [ProductsController::class, 'show'])
+                        ->name('show')
+                        ->whereNumber('product')
+                        ->middleware(Setup::detailGuard(
+                            'statamic-products::messages.utility_nav',
+                            'products',
+                        ));
                     $router->patch('{product}', [ProductsController::class, 'update'])->name('update')->whereNumber('product');
                     $router->delete('{product}', [ProductsController::class, 'destroy'])->name('destroy')->whereNumber('product');
                 });
@@ -305,7 +315,18 @@ class ServiceProvider extends AddonServiceProvider
                 ->routes(function ($router) {
                     $router->post('/', [AccessesController::class, 'store'])->name('store');
                     $router->get('new', [AccessesController::class, 'create'])->name('create');
-                    $router->get('{access}', [AccessesController::class, 'show'])->name('show')->whereNumber('access');
+                    // The detail page reads `product_accesses` and, for the
+                    // products that grant it, `products`. Without either table
+                    // it is a 500, so the guard names both when brand-context
+                    // (>= 1.27) is installed.
+                    $router->get('{access}', [AccessesController::class, 'show'])
+                        ->name('show')
+                        ->whereNumber('access')
+                        ->middleware(Setup::detailGuard(
+                            'statamic-products::messages.accesses_title',
+                            'product_accesses',
+                            'products',
+                        ));
                     $router->patch('{access}', [AccessesController::class, 'update'])->name('update')->whereNumber('access');
                     $router->delete('{access}', [AccessesController::class, 'destroy'])->name('destroy')->whereNumber('access');
                 });
