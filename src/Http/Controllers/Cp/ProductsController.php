@@ -245,18 +245,24 @@ class ProductsController extends CpController
             ->with('message', __('statamic-products::messages.saved', ['name' => $product->name]));
     }
 
-    public function update(Request $request, Product $product)
+    public function update(Request $request, int $product)
     {
         $this->authorizeAccess();
+
+        // Scoped like `show()`: the id is typed by anyone, and another
+        // brand's product is a 404, not an edit.
+        $product = Product::query()->forBrand()->findOrFail($product);
 
         $product->update($this->validated($request, $product));
 
         return back()->with('message', __('statamic-products::messages.saved', ['name' => $product->name]));
     }
 
-    public function destroy(Request $request, Product $product)
+    public function destroy(Request $request, int $product)
     {
         $this->authorizeAccess();
+
+        $product = Product::query()->forBrand()->findOrFail($product);
 
         // **Sold products are never deleted, only retired.** The handle is on
         // payment rows and invoice lines that still have to render; deleting
@@ -380,13 +386,22 @@ class ProductsController extends CpController
         // geleert. Sonst bleibt an einem einmalig verkauften Produkt ein
         // `times = 3` haengen, das niemand sieht und das beim naechsten
         // Setzen eines Intervalls ploetzlich wirkt.
-        $intervall = trim((string) ($data['interval'] ?? ''));
-        $data['interval'] = $intervall === '' ? null : $intervall;
+        //
+        // **Nur wenn der Schluessel gesendet wurde.** Ein PATCH, der `interval`
+        // nicht kennt, hat damit nichts gesagt; ihn als „leer" zu lesen leerte
+        // Rhythmus, Anzahl, Testtage und Testbetrag und antwortete 200. Ein
+        // ausdruecklich gesendetes leeres `interval` leert weiter.
+        if ($request->has('interval')) {
+            $intervall = trim((string) ($data['interval'] ?? ''));
+            $data['interval'] = $intervall === '' ? null : $intervall;
 
-        if ($data['interval'] === null) {
-            $data['times'] = null;
-            $data['trial_days'] = null;
-            $data['trial_amount_cent'] = null;
+            if ($data['interval'] === null) {
+                $data['times'] = null;
+                $data['trial_days'] = null;
+                $data['trial_amount_cent'] = null;
+            }
+        } else {
+            unset($data['interval']);
         }
 
         // **Only what was actually sent.** `$request->boolean()` answers false
@@ -398,7 +413,11 @@ class ProductsController extends CpController
         // `digital` is not in this list because it is `required`: it is either
         // present or the request never got here.
         $data['digital'] = $request->boolean('digital');
-        $data['currency'] = ($data['currency'] ?? null) ? strtoupper($data['currency']) : null;
+        if ($request->has('currency')) {
+            $data['currency'] = ($data['currency'] ?? null) ? strtoupper($data['currency']) : null;
+        } else {
+            unset($data['currency']);
+        }
 
         if ($request->has('active')) {
             $data['active'] = $request->boolean('active');
