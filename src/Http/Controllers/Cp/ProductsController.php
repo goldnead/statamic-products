@@ -53,7 +53,9 @@ class ProductsController extends CpController
             return $this->json($request);
         }
 
-        $dangling = $this->danglingCount();
+        $counts = $this->targetCounts();
+        $dangling = $counts['missing'];
+        $unknowable = $counts['unknowable'];
 
         return Inertia::render('statamic-products::Products/Index', [
             'listingUrl' => cp_route('utilities.products'),
@@ -81,6 +83,13 @@ class ProductsController extends CpController
             // genau bei dem Text um, der eine Zahl enthaelt.
             'danglingBanner' => $dangling > 0
                 ? trans_choice('statamic-products::messages.dangling_banner', $dangling, ['count' => $dangling])
+                : null,
+            // Nicht pruefbar ist keine Entwarnung und kein Fehler: getrennt
+            // gezaehlt, damit der Bildschirm „0 kaputt" nicht mehr sagt, wenn
+            // in Wahrheit nur niemand nachsehen konnte.
+            'unknowableCount' => $unknowable,
+            'unknowableBanner' => $unknowable > 0
+                ? trans_choice('statamic-products::messages.dangling_unknowable_banner', $unknowable, ['count' => $unknowable])
                 : null,
             't' => $this->strings(),
         ]);
@@ -462,13 +471,18 @@ class ProductsController extends CpController
      * Speicher liegt. Ein Produktkatalog hat Dutzende Zeilen, keine Millionen;
      * waechst er, gehoert die Zahl in einen Cache und nicht weg.
      */
-    protected function danglingCount(): int
+    protected function targetCounts(): array
     {
         $products = Product::query()->forBrand()->get();
 
         RefTarget::prime($products);
 
-        return $products->filter(fn (Product $product) => $product->refTarget()->isMissing())->count();
+        $states = $products->map(fn (Product $product) => $product->refTarget()->state);
+
+        return [
+            'missing' => $states->filter(fn (string $state) => $state === RefTarget::MISSING)->count(),
+            'unknowable' => $states->filter(fn (string $state) => $state === RefTarget::UNKNOWABLE)->count(),
+        ];
     }
 
     protected function json(FilteredRequest $request)

@@ -84,6 +84,7 @@ return [
     'ref_feed' => 'Statamic collection (handle)',
 
     'dangling_banner' => '{1} One product points at something that does not exist. Sold like that, the buyer pays and gets nothing.|[2,*] :count products point at something that does not exist. Sold like that, the buyer pays and gets nothing.',
+    'dangling_unknowable_banner' => '{1} One product points at something that could not be checked. It is not confirmed gone, but nobody has confirmed it is there either.|[2,*] :count products point at something that could not be checked. They are not confirmed gone, but nobody has confirmed they are there either.',
     'ref_missing_badge' => 'Target gone',
     'ref_missing_warning' => 'What this identifier points at does not exist. Sold like this, the buyer pays and gets nothing behind it — and nobody notices, because no error happens.',
 
@@ -207,6 +208,7 @@ return [
     'col_members' => 'Members area',
     'col_product' => 'Product',
     'column_access' => 'Access',
+    'access_unknowable_banner' => '{1} One access contains something that could not be checked. It is not confirmed gone, but nobody has confirmed it is there either.|[2,*] :count accesses contain something that could not be checked. They are not confirmed gone, but nobody has confirmed they are there either.',
     'access_missing_badge' => 'Target missing',
     'access_missing_banner' => '{1} One access contains something that does not exist. A buyer gets nothing in that place.|[2,*] :count accesses contain something that does not exist. A buyer gets nothing in that place.',
     'open_product' => 'Open product',
