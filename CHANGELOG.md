@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+
+- Saving a product with a request that does not send `interval` (or `currency`) no longer empties the payment rhythm, instalment count, trial days, trial amount and currency. Only fields that were sent are changed; an explicitly sent empty `interval` still clears them.
+- Updating or deleting a product or an access of another brand now answers 404, like the detail page already did. Single-brand installs are unaffected.
+
 ### Changed
 
 - The Control Panel product page (`/cp/utilities/products/{product}`) and access page (`/cp/utilities/product-accesses/{access}`) now ask the setup guard of `goldnead/statamic-brand-context` 1.27 or newer first: on a database whose migrations have not run they show the same setup screen as the listings instead of an HTTP 500. brand-context stays optional (`suggest`); without it, or with an older version, the pages behave as before. No migration, no new config key.

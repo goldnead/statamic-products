@@ -121,9 +121,12 @@ class AccessesController extends CpController
             ->with('message', __('statamic-products::messages.saved', ['name' => $access->name]));
     }
 
-    public function update(Request $request, Access $access)
+    public function update(Request $request, int $access)
     {
         $this->authorizeAccess();
+
+        // Scoped like `show()`: another brand's access is a 404.
+        $access = Access::query()->forBrand()->findOrFail($access);
 
         // In einer Transaktion, gegen den frisch gelesenen Stand. Die Sperre
         // hilft auf MySQL und Postgres; auf SQLite ist `lockForUpdate` nichts.
@@ -131,7 +134,7 @@ class AccessesController extends CpController
         // mit, welchen Stand es geladen hat, und ein inzwischen geaenderter
         // Datensatz wird nicht still ueberschrieben.
         $access = DB::transaction(function () use ($request, $access) {
-            $fresh = Access::query()->lockForUpdate()->findOrFail($access->getKey());
+            $fresh = Access::query()->forBrand()->lockForUpdate()->findOrFail($access->getKey());
 
             $version = $request->input('version');
 
@@ -154,9 +157,11 @@ class AccessesController extends CpController
         return back()->with('message', __('statamic-products::messages.saved', ['name' => $access->name]));
     }
 
-    public function destroy(Access $access)
+    public function destroy(int $access)
     {
         $this->authorizeAccess();
+
+        $access = Access::query()->forBrand()->findOrFail($access);
 
         // Wie beim verkauften Produkt: ein Slug, den eine Vergabe traegt, hat
         // Datensaetze ausserhalb dieses Addons, die weiter lesbar sein muessen.
