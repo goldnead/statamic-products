@@ -75,7 +75,31 @@ class SilentFailureSmallTest extends TestCase
         }
 
         $this->assertNull($choices);
-        Log::shouldHaveReceived('warning')->once();
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $m, array $c = []) => ($c['exception'] ?? null) instanceof \Throwable)
+            ->once();
+    }
+
+    #[Test]
+    public function an_event_list_of_exactly_500_is_not_reported_as_capped(): void
+    {
+        Schema::create('events', function (Blueprint $table) {
+            $table->id();
+            $table->uuid('uuid')->nullable();
+            $table->string('title');
+        });
+
+        DB::table('events')->insert(array_map(fn (int $i) => [
+            'uuid' => sprintf('00000000-0000-0000-0000-%012d', $i),
+            'title' => 'Termin '.str_pad((string) $i, 4, '0', STR_PAD_LEFT),
+        ], range(1, 500)));
+
+        Log::spy();
+
+        $choices = $this->invokeEventChoices();
+
+        $this->assertCount(500, $choices);
+        Log::shouldNotHaveReceived('warning');
     }
 
     #[Test]
@@ -97,7 +121,9 @@ class SilentFailureSmallTest extends TestCase
         $choices = $this->invokeEventChoices();
 
         $this->assertCount(500, $choices);
-        Log::shouldHaveReceived('warning')->once();
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $m) => str_contains($m, 'capped at 500'))
+            ->once();
     }
 
     #[Test]
@@ -162,8 +188,8 @@ class SilentFailureSmallTest extends TestCase
 
         new AccessGraph;
 
-        Log::shouldHaveReceived('warning')
-            ->withArgs(fn (string $message, array $context) => ($context['ref'] ?? null) === 'geloescht-42')
+        Log::shouldHaveReceived('info')
+            ->withArgs(fn (string $message, array $context = []) => ($context['ref'] ?? null) === 'geloescht-42')
             ->once();
     }
 

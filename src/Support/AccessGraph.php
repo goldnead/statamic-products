@@ -266,7 +266,7 @@ final class AccessGraph
             // Der Kurs ist weg, der Zugang zeigt trotzdem darauf: im Zweifel
             // nur die ID, und das muss man im Log sehen koennen.
             if ($entry === null) {
-                Log::warning('statamic-products: an access points at a course that no longer exists; it is covered by its entry id only.', [
+                Log::info('statamic-products: an access points at a course that no longer exists; it is covered by its entry id only.', [
                     'ref' => $id,
                 ]);
 
