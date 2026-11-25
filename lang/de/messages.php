@@ -84,6 +84,7 @@ return [
     'ref_feed' => 'Statamic-Collection (Kennung)',
 
     'dangling_banner' => '{1} Ein Produkt zeigt auf etwas, das es nicht gibt. Verkauft man es so, ist bezahlt und nichts dahinter.|[2,*] :count Produkte zeigen auf etwas, das es nicht gibt. Verkauft man sie so, ist bezahlt und nichts dahinter.',
+    'dangling_unknowable_banner' => '{1} Ein Produkt zeigt auf etwas, das sich nicht prüfen ließ. Es ist nicht bestätigt weg, aber auch niemand hat bestätigt, dass es da ist.|[2,*] :count Produkte zeigen auf etwas, das sich nicht prüfen ließ. Sie sind nicht bestätigt weg, aber auch niemand hat bestätigt, dass es da ist.',
     'ref_missing_badge' => 'Ziel fehlt',
     'ref_missing_warning' => 'Das Ziel dieser Kennung existiert nicht. Wird das Produkt so verkauft, ist bezahlt und nichts dahinter — und niemand merkt es, weil kein Fehler entsteht.',
 
@@ -207,6 +208,7 @@ return [
     'col_members' => 'Mitgliederbereich',
     'col_product' => 'Produkt',
     'column_access' => 'Zugang',
+    'access_unknowable_banner' => '{1} Ein Zugang enthält etwas, das sich nicht prüfen ließ. Es ist nicht bestätigt weg, aber auch niemand hat bestätigt, dass es da ist.|[2,*] :count Zugänge enthalten etwas, das sich nicht prüfen ließ. Sie sind nicht bestätigt weg, aber auch niemand hat bestätigt, dass es da ist.',
     'access_missing_badge' => 'Ziel fehlt',
     'access_missing_banner' => '{1} Ein Zugang enthält etwas, das es nicht gibt. Wer ihn kauft, bekommt an dieser Stelle nichts.|[2,*] :count Zugänge enthalten etwas, das es nicht gibt. Wer sie kauft, bekommt an dieser Stelle nichts.',
     'open_product' => 'Produkt öffnen',

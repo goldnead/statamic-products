@@ -9,6 +9,7 @@ use Goldnead\StatamicProducts\Models\Access;
 use Goldnead\StatamicProducts\Models\Product;
 use Goldnead\StatamicProducts\Support\AccessContainers;
 use Goldnead\StatamicProducts\Support\ContentKinds;
+use Goldnead\StatamicProducts\Support\RefTarget;
 use Goldnead\StatamicProducts\Support\SessionTypes;
 use Goldnead\StatamicProducts\Support\Setup;
 use Illuminate\Database\Eloquent\Builder;
@@ -51,7 +52,8 @@ class AccessesController extends CpController
             return $this->json($request);
         }
 
-        $missing = $this->missingCount();
+        $counts = $this->targetCounts();
+        $missing = $counts['missing'];
 
         return Inertia::render('statamic-products::Accesses/Index', [
             'listingUrl' => cp_route('utilities.product-accesses'),
@@ -62,6 +64,10 @@ class AccessesController extends CpController
             'missingCount' => $missing,
             'missingBanner' => $missing > 0
                 ? trans_choice('statamic-products::messages.access_missing_banner', $missing, ['count' => $missing])
+                : null,
+            'unknowableCount' => $counts['unknowable'],
+            'unknowableBanner' => $counts['unknowable'] > 0
+                ? trans_choice('statamic-products::messages.access_unknowable_banner', $counts['unknowable'], ['count' => $counts['unknowable']])
                 : null,
             't' => $this->strings(),
         ]);
@@ -660,11 +666,31 @@ class AccessesController extends CpController
             ->all();
     }
 
-    protected function missingCount(): int
+    /**
+     * Zugaenge mit einem fehlenden Ziel und Zugaenge mit einem nicht pruefbaren
+     * Ziel, getrennt gezaehlt. Ein Zugang kann in beiden Zahlen stehen.
+     *
+     * @return array{missing: int, unknowable: int}
+     */
+    protected function targetCounts(): array
     {
-        return Access::query()->forBrand()->get()
-            ->filter(fn (Access $access) => ListedAccess::hasMissingContent($access))
-            ->count();
+        $missing = 0;
+        $unknowable = 0;
+
+        foreach (Access::query()->forBrand()->get() as $access) {
+            $states = collect($access->contentItems())
+                ->map(fn (array $item) => RefTarget::forContent($item['kind'], $item['ref'])->state);
+
+            if ($states->contains(RefTarget::MISSING)) {
+                $missing++;
+            }
+
+            if ($states->contains(RefTarget::UNKNOWABLE)) {
+                $unknowable++;
+            }
+        }
+
+        return ['missing' => $missing, 'unknowable' => $unknowable];
     }
 
     protected function json(FilteredRequest $request)

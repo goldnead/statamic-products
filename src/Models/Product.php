@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
@@ -127,6 +128,18 @@ class Product extends Model
             // `statamic-payments`.
             if ($product->getAttribute('brand_id') === null) {
                 $product->setAttribute('brand_id', Brands::stampId());
+            }
+        });
+
+        // The same freeze the controller applies to the form (see
+        // `ProductsController::validated()`), held here as well: a sold handle
+        // is what accesses and purchases point at, and a save that bypasses the
+        // controller (a command, a seeder, a later caller) must not move it.
+        static::updating(function (self $product): void {
+            if ($product->isDirty('handle') && $product->hasBeenSold()) {
+                throw ValidationException::withMessages([
+                    'handle' => __('statamic-products::messages.handle_frozen'),
+                ]);
             }
         });
     }
