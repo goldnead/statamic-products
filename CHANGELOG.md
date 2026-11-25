@@ -6,6 +6,7 @@
 
 - Saving a product with a request that does not send `interval` (or `currency`) no longer empties the payment rhythm, instalment count, trial days, trial amount and currency. Only fields that were sent are changed; an explicitly sent empty `interval` still clears them.
 - Updating or deleting a product or an access of another brand now answers 404, like the detail page already did. Single-brand installs are unaffected.
+- Failures that were swallowed silently now reach the log: the file pickers, course and event lists of the access form, the brand names of the access picker, the catalogue guard (with the exception itself), and an access pointing at a deleted course. The event list is logged when it is capped at 500 entries.
 
 ### Changed
 

@@ -5,6 +5,7 @@ namespace Goldnead\StatamicProducts\Support;
 use Goldnead\BrandContext\Models\Brand;
 use Goldnead\StatamicPayments\Support\Brands;
 use Goldnead\StatamicProducts\Models\Access;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
@@ -97,7 +98,12 @@ final class GrantableAccesses
             return Brand::query()->pluck('name', 'id')
                 ->map(fn ($name) => (string) $name)
                 ->all();
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            // Die Liste bleibt, nur ohne Markennamen; ohne Log saehe man es nie.
+            Log::warning('statamic-products: could not read the brand names; the access list shows no brand groups.', [
+                'exception' => $e,
+            ]);
+
             return [];
         }
     }
