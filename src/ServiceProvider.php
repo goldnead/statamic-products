@@ -217,7 +217,7 @@ class ServiceProvider extends AddonServiceProvider
             return $callback();
         } catch (Throwable $e) {
             Log::error("statamic-products: could not {$what}; the catalogue is answering as if this addon were not installed.", [
-                'exception' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             return null;

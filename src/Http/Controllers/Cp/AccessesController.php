@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -568,8 +569,12 @@ class AccessesController extends CpController
                 })
                 ->values()
                 ->all();
-        } catch (Throwable) {
+        } catch (Throwable $e) {
             // Ohne Picker bleibt das Textfeld; geprueft wird der Verweis trotzdem.
+            Log::warning('statamic-products: could not load the file pickers; the file fields stay plain text.', [
+                'exception' => $e,
+            ]);
+
             return [];
         }
     }
@@ -597,7 +602,11 @@ class AccessesController extends CpController
                 ->sortBy('label')
                 ->values()
                 ->all();
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            Log::warning('statamic-products: could not read the courses for the access picker.', [
+                'exception' => $e,
+            ]);
+
             return null;
         }
     }
@@ -631,15 +640,27 @@ class AccessesController extends CpController
                 return null;
             }
 
-            return DB::table('events')
+            // 501 holen, damit man weiss, ob gekappt wurde, ohne zu zaehlen.
+            $rows = DB::table('events')
                 ->when(Brands::multiBrand(), fn ($q) => $q->where('brand_id', (int) Brands::readerId()))
                 ->orderBy('title')
-                ->limit(500)
-                ->get(['uuid', 'title'])
+                ->limit(501)
+                ->get(['uuid', 'title']);
+
+            if ($rows->count() > 500) {
+                Log::warning('statamic-products: the event list is capped at 500; later events are not offered in the access picker.');
+            }
+
+            return $rows
+                ->take(500)
                 ->map(fn ($event) => ['value' => (string) $event->uuid, 'label' => (string) $event->title])
                 ->values()
                 ->all();
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            Log::warning('statamic-products: could not read the events for the access picker.', [
+                'exception' => $e,
+            ]);
+
             return null;
         }
     }
